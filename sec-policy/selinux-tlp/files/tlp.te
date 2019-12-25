@@ -1,0 +1,55 @@
+policy_module(tlp, 1.0.0)
+
+type tlp_t;
+type tlp_exec_t;
+init_daemon_domain(tlp_t, tlp_exec_t)
+
+type tlp_etc_t;
+files_config_file(tlp_etc_t)
+
+type tlp_initrc_exec_t;
+init_script_file(tlp_initrc_exec_t)
+
+type tlp_var_run_t;
+files_pid_file(tlp_var_run_t)
+
+init_domtrans_script(tlp_t)
+
+allow tlp_t self:capability { net_admin sys_rawio };
+allow tlp_t self:fifo_file rw_fifo_file_perms;
+
+list_dirs_pattern(tlp_t, tlp_etc_t, tlp_etc_t)
+read_files_pattern(tlp_t, tlp_etc_t, tlp_etc_t)
+allow tlp_t tlp_etc_t:file { execute execute_no_trans };
+
+files_search_pids(tlp_t)
+
+manage_dirs_pattern(tlp_t, tlp_var_run_t, tlp_var_run_t)
+manage_files_pattern(tlp_t, tlp_var_run_t, tlp_var_run_t)
+files_pid_filetrans(tlp_t, tlp_var_run_t, { dir file })
+
+miscfiles_read_localization(tlp_t)
+logging_send_syslog_msg(tlp_t)
+
+dev_associate_sysfs(tlp_t)
+dev_rw_sysfs(tlp_t)
+auth_use_nsswitch(tlp_t)
+
+corecmd_exec_bin(tlp_t)
+corecmd_exec_shell(tlp_t)
+
+kernel_getattr_proc_files(tlp_t)
+modutils_domtrans(tlp_t)
+
+kernel_rw_fs_sysctls(tlp_t)
+kernel_rw_vm_sysctls(tlp_t)
+kernel_read_kernel_sysctls(tlp_t)
+
+#dev_getattr_cpu_dev(tlp_t)
+dev_rw_cpu_microcode(tlp_t)
+
+storage_raw_read_fixed_disk(tlp_t)
+
+udev_domtrans(tlp_t)
+fstools_exec(tlp_t)
+sysnet_exec_ifconfig(tlp_t)

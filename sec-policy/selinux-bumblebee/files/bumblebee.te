@@ -1,0 +1,45 @@
+policy_module(bumblebee, 1.0.0)
+
+type bumblebeed_t;
+type bumblebeed_exec_t;
+init_daemon_domain(bumblebeed_t, bumblebeed_exec_t)
+
+type bumblebeed_initrc_exec_t;
+init_script_file(bumblebeed_initrc_exec_t)
+
+type bumblebeed_var_run_t;
+files_pid_file(bumblebeed_var_run_t)
+
+init_domtrans_script(bumblebeed_t)
+
+allow bumblebeed_t self:capability setgid;
+allow bumblebeed_t self:process signal_perms;
+allow bumblebeed_t self:fifo_file read_fifo_file_perms;
+allow bumblebeed_t self:udp_socket create_socket_perms;
+
+files_search_pids(bumblebeed_t)
+files_pid_filetrans(bumblebeed_t, bumblebeed_var_run_t, { file sock_file })
+
+manage_files_pattern(bumblebeed_t, bumblebeed_var_run_t, bumblebeed_var_run_t)
+manage_sock_files_pattern(bumblebeed_t, bumblebeed_var_run_t, bumblebeed_var_run_t)
+
+can_exec(bumblebeed_t, bumblebeed_exec_t)
+
+kernel_getattr_proc_files(bumblebeed_t)
+kernel_write_proc_files(bumblebeed_t)
+modutils_domtrans(bumblebeed_t)
+
+dev_read_sysfs(bumblebeed_t)
+
+miscfiles_read_localization(bumblebeed_t)
+logging_send_syslog_msg(bumblebeed_t)
+
+xserver_domtrans(bumblebeed_t)
+xserver_kill(bumblebeed_t)
+xserver_signal(bumblebeed_t)
+xserver_stream_connect(bumblebeed_t)
+xserver_read_xdm_tmp_files(bumblebeed_t)
+corenet_tcp_connect_xserver_port(bumblebeed_t)
+
+allow bumblebeed_t etc_t:file read_file_perms;
+allow bumblebeed_t proc_t:file read_file_perms;
