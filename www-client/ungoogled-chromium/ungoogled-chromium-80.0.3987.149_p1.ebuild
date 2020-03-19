@@ -2,7 +2,7 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-PYTHON_COMPAT=( python2_7 python3_{5,6,7,8} )
+PYTHON_COMPAT=( python2_7 python3_{7,8} )
 
 CHROMIUM_LANGS="am ar bg bn ca cs da de el en-GB es es-419 et fa fi fil fr gu he
 	hi hr hu id it ja kn ko lt lv ml mr ms nb nl pl pt-BR pt-PT ro ru sk sl sr
@@ -27,7 +27,11 @@ SLOT="0"
 KEYWORDS="amd64 ~arm64 ~x86"
 IUSE="+closure-compile component-build cups custom-cflags cpu_flags_arm_neon +hangouts kerberos pic +proprietary-codecs pulseaudio selinux +suid +system-ffmpeg +system-icu +system-libvpx +tcmalloc widevine"
 RESTRICT="!system-ffmpeg? ( proprietary-codecs? ( bindist ) )"
-REQUIRED_USE="component-build? ( !suid )"
+REQUIRED_USE="
+	component-build? ( !suid )
+	|| ( $(python_gen_useflags 'python2*') )
+	|| ( $(python_gen_useflags 'python3*') )
+	"
 
 COMMON_DEPEND="
 	>=app-accessibility/at-spi2-atk-2.26:2
@@ -209,10 +213,10 @@ src_unpack() {
 
 src_prepare() {
 
-	cd ${WORKDIR}/${UC_P} 
+	cd ${WORKDIR}/${UC_P}
 	python_setup 'python3*'
 	./utils/prune_binaries.py build/src pruning.list || die
-	./utils/patches.py apply build/src patches
+	./utils/patches.py apply build/src patches || die
 	./utils/domain_substitution.py apply -r domain_regex.list -f domain_substitution.list -c build/domsubcache.tar.gz build/src || die
 
 	cd ${S}
