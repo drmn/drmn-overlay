@@ -18,23 +18,22 @@ S="${WORKDIR}/${C_P}"
 
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-XCB_PROTO_VERSION="1.14"
-PATCHSET="3"
+PATCHSET="2"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://files.pythonhosted.org/packages/ed/7b/bbf89ca71e722b7f9464ebffe4b5ee20a9e5c9a555a56e2d3914bb9119a6/setuptools-44.1.0.zip
-	https://www.x.org/releases/individual/proto/xcb-proto-${XCB_PROTO_VERSION}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
 
 LICENSE="BSD"
 SLOT="0"
 KEYWORDS="amd64 ~arm64 ~x86"
-IUSE="+closure-compile component-build cups custom-cflags cpu_flags_arm_neon +hangouts headless kerberos ozone pic +proprietary-codecs pulseaudio selinux +suid +system-ffmpeg +system-icu +system-libvpx +tcmalloc wayland widevine"
+IUSE="component-build cups custom-cflags cpu_flags_arm_neon +hangouts headless +js-type-check kerberos ozone ozone-wayland pic +proprietary-codecs pulseaudio selinux +suid +system-ffmpeg +system-icu +system-libvpx +tcmalloc widevine"
 RESTRICT="!system-ffmpeg? ( proprietary-codecs? ( bindist ) )"
 REQUIRED_USE="
 	component-build? ( !suid )
-	wayland? ( ozone )
+	headless? ( ozone )
+	ozone-wayland? ( ozone )
 	|| ( $(python_gen_useflags 'python2*') )
 	|| ( $(python_gen_useflags 'python3*') )
 "
@@ -92,10 +91,11 @@ COMMON_DEPEND="
 	ozone? (
 		!headless? (
 			${COMMON_X_DEPEND}
-			x11-libs/gtk+:3[wayland?,X]
-			wayland? (
+			x11-libs/gtk+:3[X]
+			ozone-wayland? (
 				dev-libs/wayland:=
 				dev-libs/libffi:=
+				x11-libs/gtk+:3[wayland,X]
 				x11-libs/libdrm:=
 				x11-libs/libxkbcommon:=
 			)
@@ -135,7 +135,7 @@ BDEPEND="
 	>=sys-devel/bison-2.4.3
 	sys-devel/flex
 	virtual/pkgconfig
-	closure-compile? ( virtual/jre )
+	js-type-check? ( virtual/jre )
 "
 
 : ${CHROMIUM_FORCE_CLANG=no}
@@ -388,6 +388,7 @@ src_prepare() {
 		third_party/node
 		third_party/node/node_modules/polymer-bundler/lib/third_party/UglifyJS2
 		third_party/one_euro_filter
+		third_party/opencv
 		third_party/openscreen
 		third_party/openscreen/src/third_party/mozilla
 		third_party/openscreen/src/third_party/tinycbor/src/src
@@ -446,6 +447,7 @@ src_prepare() {
 		third_party/widevine
 		third_party/woff2
 		third_party/wuffs
+		third_party/xcbproto
 		third_party/zlib/google
 		tools/grit/third_party/six
 		url/third_party/mozilla
@@ -484,7 +486,7 @@ src_prepare() {
 	if use tcmalloc; then
 		keeplibs+=( third_party/tcmalloc )
 	fi
-	if use ozone && use wayland && ! use headless ; then
+	if use ozone && use ozone-wayland && ! use headless ; then
 		keeplibs+=( third_party/wayland )
 	fi
 	if [[ ${CHROMIUM_FORCE_LIBCXX} == yes ]]; then
@@ -599,7 +601,7 @@ src_configure() {
 	myconf_gn+=" use_gnome_keyring=false"
 
 	# Optional dependencies.
-	myconf_gn+=" closure_compile=$(usex closure-compile true false)"
+	myconf_gn+=" enable_js_type_check=$(usex js-type-check true false)"
 	myconf_gn+=" enable_hangout_services_extension=$(usex hangouts true false)"
 	myconf_gn+=" enable_widevine=$(usex widevine true false)"
 	myconf_gn+=" use_cups=$(usex cups true false)"
@@ -704,13 +706,18 @@ src_configure() {
 	# Chromium relies on this, but was disabled in >=clang-10, crbug.com/1042470
 	append-cxxflags $(test-flags-CXX -flax-vector-conversions=all)
 
+	# Disable unknown warning message from clang.
+	tc-is-clang && append-flags -Wno-unknown-warning-option
+
+	# Required to compile ungoogled-chromium-85.
+	append-cxxflags $(test-flags-CXX -fdata-sections)
+	append-cxxflags $(test-flags-CXX -ffunction-sections)
+	append-ldflags -Wl,--gc-sections
+
 	# Explicitly disable ICU data file support for system-icu builds.
 	if use system-icu; then
 		myconf_gn+=" icu_use_data_file=false"
 	fi
-
-	# Use bundled xcb-proto, bug #727000
-	myconf_gn+=" xcbproto_path=\"${WORKDIR}/xcb-proto-${XCB_PROTO_VERSION}/src\""
 
 	# Enable ozone support
 	if use ozone; then
@@ -718,10 +725,10 @@ src_configure() {
 		myconf_gn+=" ozone_platform_headless=true"
 		if ! use headless; then
 			myconf_gn+=" use_system_libdrm=true"
-			myconf_gn+=" ozone_platform_wayland=$(usex wayland true false)"
+			myconf_gn+=" ozone_platform_wayland=$(usex ozone-wayland true false)"
 			myconf_gn+=" ozone_platform_x11=true"
 			myconf_gn+=" ozone_platform_headless=true"
-			if use wayland; then
+			if use ozone-wayland; then
 				myconf_gn+=" use_system_minigbm=true use_xkbcommon=true"
 				myconf_gn+=" ozone_platform=\"wayland\""
 			else
@@ -734,8 +741,8 @@ src_configure() {
 
 	# ungoogled-chromium flags
 	#myconf_gn+=" clang_use_chrome_plugins=false"
-	#myconf_gn+=" closure_compile=false"
 	#myconf_gn+=" enable_hangout_services_extension=false"
+	#myconf_gn+=" enable_js_type_check=false"
 	myconf_gn+=" enable_mdns=false"
 	myconf_gn+=" enable_mse_mpeg2ts_stream_parser=true"
 	#myconf_gn+=" enable_nacl=false"
@@ -752,7 +759,7 @@ src_configure() {
 	myconf_gn+=" google_default_client_id=\"\""
 	myconf_gn+=" google_default_client_secret=\"\""
 	myconf_gn+=" safe_browsing_mode=0"
-	myconf_gn+=" treat_warnings_as_errors=false"
+	# myconf_gn+=" treat_warnings_as_errors=false"
 	myconf_gn+=" use_official_google_api_keys=false"
 	myconf_gn+=" use_unofficial_version_number=false"
 
@@ -770,8 +777,7 @@ src_compile() {
 	python_setup 'python2*'
 
 	# https://bugs.gentoo.org/717456
-	# Use bundled xcb-proto, because system xcb-proto doesn't have Python 2.7 support
-	local -x PYTHONPATH="${WORKDIR}/setuptools-44.1.0:${WORKDIR}/xcb-proto-${XCB_PROTO_VERSION}${PYTHONPATH+:}${PYTHONPATH}"
+	local -x PYTHONPATH="${WORKDIR}/setuptools-44.1.0:${PYTHONPATH+:}${PYTHONPATH}"
 
 	#"${EPYTHON}" tools/clang/scripts/update.py --force-local-build --gcc-toolchain /usr --skip-checkout --use-system-cmake --without-android || die
 
@@ -822,7 +828,7 @@ src_install() {
 	doexe out/Release/chromedriver
 
 	ozone_auto_session () {
-		use ozone && use wayland && ! use headless && echo true || echo false
+		use ozone && use ozone-wayland && ! use headless && echo true || echo false
 	}
 	local sedargs=( -e
 			"s:/usr/lib/:/usr/$(get_libdir)/:g;
