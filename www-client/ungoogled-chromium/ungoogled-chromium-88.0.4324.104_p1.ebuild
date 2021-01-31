@@ -33,6 +33,8 @@ IUSE="component-build cups custom-cflags cpu_flags_arm_neon +hangouts headless +
 
 REQUIRED_USE="
 	component-build? ( !suid )
+	|| ( $(python_gen_useflags 'python2*') )
+	|| ( $(python_gen_useflags 'python3*') )
 "
 
 COMMON_X_DEPEND="
