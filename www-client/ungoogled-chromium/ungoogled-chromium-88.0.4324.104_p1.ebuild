@@ -2,14 +2,14 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=7
-PYTHON_COMPAT=( python2_7 python3_{7,8,9} )
+PYTHON_COMPAT=( python2_7 )
 PYTHON_REQ_USE="xml"
 
 CHROMIUM_LANGS="am ar bg bn ca cs da de el en-GB es es-419 et fa fi fil fr gu he
 	hi hr hu id it ja kn ko lt lv ml mr ms nb nl pl pt-BR pt-PT ro ru sk sl sr
 	sv sw ta te th tr uk vi zh-CN zh-TW"
 
-inherit check-reqs chromium-2 desktop flag-o-matic multilib ninja-utils pax-utils portability python-r1 readme.gentoo-r1 toolchain-funcs xdg-utils
+inherit check-reqs chromium-2 desktop flag-o-matic multilib ninja-utils pax-utils portability python-any-r1 readme.gentoo-r1 toolchain-funcs xdg-utils
 
 C_PV=${PV/_p*/}
 C_P=chromium-${C_PV}
@@ -33,8 +33,6 @@ IUSE="component-build cups custom-cflags cpu_flags_arm_neon +hangouts headless +
 
 REQUIRED_USE="
 	component-build? ( !suid )
-	|| ( $(python_gen_useflags 'python2*') )
-	|| ( $(python_gen_useflags 'python3*') )
 "
 
 COMMON_X_DEPEND="
@@ -129,6 +127,7 @@ BDEPEND="
 	sys-devel/flex
 	virtual/pkgconfig
 	js-type-check? ( virtual/jre )
+	>=dev-lang/python-3.7.9-r1
 "
 
 # These are intended for ebuild maintainer use to force clang if GCC is broken.
@@ -242,11 +241,23 @@ src_unpack() {
 }
 
 src_prepare() {
+	# Apply ungoogled-chromum patches
+	cd ${WORKDIR}/${UC_P}
+
+	# This patch is duplicated by chromium-87-compiler.patch from Gentoo patchset
+	sed -i -e '/core\/ungoogled-chromium\/remove-enable-dse-memoryssa-cflag.patch/d' patches/series
+
+	python3 ./utils/prune_binaries.py build/src pruning.list || die
+	python3 ./utils/patches.py apply build/src patches || die
+	python3 ./utils/domain_substitution.py apply -r domain_regex.list -f domain_substitution.list -c build/domsubcache.tar.gz build/src || die
+
+	# Back to chromium build process
+	cd ${S}
+
 	# Calling this here supports resumption via FEATURES=keepwork
-	python_setup 'python2*'
+	python_setup
 
 	rm "${WORKDIR}/patches/chromium-84-blink-disable-clang-format.patch" || die
-
 
 	local PATCHES=(
 		"${WORKDIR}/patches"
@@ -255,21 +266,6 @@ src_prepare() {
 	)
 
 	default
-
-	python_setup 'python3*'
-	cd ${WORKDIR}/${UC_P}
-
-	# This patch is duplicated by chromium-87-compiler.patch from Gentoo patchset
-	sed -i -e '/core\/ungoogled-chromium\/remove-enable-dse-memoryssa-cflag.patch/d' patches/series
-
-	./utils/prune_binaries.py build/src pruning.list || die
-	./utils/patches.py apply build/src patches || die
-	./utils/domain_substitution.py apply -r domain_regex.list -f domain_substitution.list -c build/domsubcache.tar.gz build/src || die
-
-	cd ${S}
-
-	# Calling this here supports resumption via FEATURES=keepwork
-	python_setup 'python2*'
 
 	mkdir -p third_party/node/linux/node-linux-x64/bin || die
 	ln -s "${EPREFIX}"/usr/bin/node third_party/node/linux/node-linux-x64/bin/node || die
