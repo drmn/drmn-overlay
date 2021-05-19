@@ -9,7 +9,7 @@ DESCRIPTION="An implementation of the 5250 telnet protocol"
 HOMEPAGE="http://tn5250.sourceforge.net/"
 SRC_URI="mirror://sourceforge/tn5250/${P}.tar.gz"
 
-LICENSE="GPL-2"
+LICENSE="LGPL-2.1"
 SLOT="0"
 KEYWORDS="amd64 x86"
 
