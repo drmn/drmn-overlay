@@ -20,20 +20,17 @@ S="${WORKDIR}/${C_P}"
 
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET="7"
+PATCHSET="6"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
-PPC64LE_PATCHSET="92-ppc64le-1"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
-	https://files.pythonhosted.org/packages/ed/7b/bbf89ca71e722b7f9464ebffe4b5ee20a9e5c9a555a56e2d3914bb9119a6/setuptools-44.1.0.zip
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
 	https://dev.gentoo.org/~sultan/distfiles/www-client/${C_PN}/${C_PN}-92-glibc-2.33-patch.tar.xz
 	arm64? ( https://github.com/google/highway/archive/refs/tags/0.12.1.tar.gz -> highway-0.12.1.tar.gz )
-	ppc64? ( https://dev.gentoo.org/~gyakovlev/distfiles/${C_PN}-${PPC64LE_PATCHSET}.tar.xz )
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
 
 LICENSE="BSD"
 SLOT="0"
-KEYWORDS="amd64 ~arm64 ~ppc64 ~x86"
+KEYWORDS="amd64 arm64 ~x86"
 IUSE="component-build cups custom-cflags cpu_flags_arm_neon +hangouts headless +js-type-check kerberos official pic +proprietary-codecs pulseaudio screencast selinux +suid +system-ffmpeg +system-icu vaapi wayland widevine"
 REQUIRED_USE="
 	component-build? ( !suid )
@@ -41,7 +38,7 @@ REQUIRED_USE="
 "
 
 COMMON_X_DEPEND="
-	media-libs/mesa:=[gbm]
+	media-libs/mesa:=[gbm(+)]
 	x11-libs/libX11:=
 	x11-libs/libXcomposite:=
 	x11-libs/libXcursor:=
@@ -67,7 +64,7 @@ COMMON_DEPEND="
 	>=dev-libs/nss-3.26:=
 	>=media-libs/alsa-lib-1.0.19:=
 	media-libs/fontconfig:=
-	media-libs/freetype:=
+	>=media-libs/freetype-2.11.0:=
 	>=media-libs/harfbuzz-2.4.0:0=[icu(-)]
 	media-libs/libjpeg-turbo:=
 	media-libs/libpng:=
@@ -117,10 +114,11 @@ DEPEND="${COMMON_DEPEND}
 # dev-vcs/git - https://bugs.gentoo.org/593476
 BDEPEND="
 	${PYTHON_DEPS}
+	$(python_gen_any_dep '
+		dev-python/setuptools[${PYTHON_USEDEP}]
+	')
 	>=app-arch/gzip-1.7
-	app-arch/unzip
 	dev-lang/perl
-	dev-lang/python:2.7[xml]
 	>=dev-util/gn-0.1807
 	dev-vcs/git
 	>=dev-util/gperf-3.0.3
@@ -131,7 +129,6 @@ BDEPEND="
 	sys-devel/flex
 	virtual/pkgconfig
 	js-type-check? ( virtual/jre )
-	>=dev-lang/python-3.7.9-r1
 "
 
 # These are intended for ebuild maintainer use to force clang if GCC is broken.
@@ -190,6 +187,10 @@ them in Chromium, then add --password-store=basic to CHROMIUM_FLAGS
 in /etc/chromium/default.
 "
 
+python_check_deps() {
+	has_version -b "dev-python/setuptools[${PYTHON_USEDEP}]"
+}
+
 pre_build_checks() {
 	if [[ ${MERGE_TYPE} != binary ]]; then
 		local -x CPP="$(tc-getCXX) -E"
@@ -242,46 +243,37 @@ src_unpack() {
 }
 
 src_prepare() {
+	# Calling this here supports resumption via FEATURES=keepwork
+	python_setup
+
 	# Apply ungoogled-chromum patches
 	cd ${WORKDIR}/${UC_P}
 
-	python3 ./utils/prune_binaries.py build/src pruning.list || die
-	python3 ./utils/patches.py apply build/src patches || die
-	python3 ./utils/domain_substitution.py apply -r domain_regex.list -f domain_substitution.list -c build/domsubcache.tar.gz build/src || die
+	python ./utils/prune_binaries.py build/src pruning.list || die
+	python ./utils/patches.py apply build/src patches || die
+	python ./utils/domain_substitution.py apply -r domain_regex.list -f domain_substitution.list -c build/domsubcache.tar.gz build/src || die
 
 	# Back to chromium build process
 	cd ${S}
-
-	# Calling this here supports resumption via FEATURES=keepwork
-	python_setup
 
 	local PATCHES=(
 		"${WORKDIR}/patches"
 		"${WORKDIR}/sandbox-patches/chromium-syscall_broker.patch"
 		"${WORKDIR}/sandbox-patches/chromium-fstatat-crash.patch"
-		"${FILESDIR}/chromium-92-EnumTable-crash.patch"
-		"${FILESDIR}/chromium-92-crashpad-consent.patch"
-		"${FILESDIR}/chromium-freetype-2.11.patch"
+		"${FILESDIR}/chromium-93-EnumTable-crash.patch"
+		"${FILESDIR}/chromium-93-InkDropHost-crash.patch"
+		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
 		"${FILESDIR}/chromium-shim_headers.patch"
+		"${FILESDIR}/chromium-93-fix-build-with-system-ffmpeg.patch"
 	)
 
-	if use ppc64; then
-		eapply "${WORKDIR}/${PN}-ppc64le/xxx-ppc64le-libvpx.patch"
-		eapply "${WORKDIR}/${PN}-ppc64le/xxx-ppc64le-support.patch"
-		eapply "${WORKDIR}/${PN}-ppc64le/xxx-ppc64le-swiftshader.patch"
-	fi
-
 	default
-
-	# this patch needs to be applied after gentoo sandbox patchset
-	use ppc64 && eapply "${WORKDIR}/${PN}-ppc64le/xxx-ppc64le-sandbox_kernel_stat.patch"
 
 	mkdir -p third_party/node/linux/node-linux-x64/bin || die
 	ln -s "${EPREFIX}"/usr/bin/node third_party/node/linux/node-linux-x64/bin/node || die
 
-	# adjust python interpreter versions
+	# adjust python interpreter version
 	sed -i -e "s|\(^script_executable = \).*|\1\"${EPYTHON}\"|g" .gn || die
-	sed -i -e "s|python2|python2\.7|g" buildtools/linux64/clang-format || die
 
 	# bundled highway library does not support arm64 with GCC
 	if use arm64; then
@@ -313,7 +305,6 @@ src_prepare() {
 		third_party/angle/src/common/third_party/base
 		third_party/angle/src/common/third_party/smhasher
 		third_party/angle/src/common/third_party/xxhash
-		third_party/angle/src/third_party/compiler
 		third_party/angle/src/third_party/libXNVCtrl
 		third_party/angle/src/third_party/trace_event
 		third_party/angle/src/third_party/volk
@@ -328,8 +319,8 @@ src_prepare() {
 		third_party/catapult
 		third_party/catapult/common/py_vulcanize/third_party/rcssmin
 		third_party/catapult/common/py_vulcanize/third_party/rjsmin
-		third_party/catapult/third_party/beautifulsoup4
-		third_party/catapult/third_party/html5lib-python
+		third_party/catapult/third_party/beautifulsoup4-4.9.3
+		third_party/catapult/third_party/html5lib-1.1
 		third_party/catapult/third_party/polymer
 		third_party/catapult/third_party/six
 		third_party/catapult/tracing/third_party/d3
@@ -485,6 +476,7 @@ src_prepare() {
 		third_party/tflite/src/third_party/fft2d
 		third_party/tflite-support
 		third_party/ruy
+		third_party/six
 		third_party/ukey2
 		third_party/unrar
 		third_party/usrsctp
@@ -508,7 +500,6 @@ src_prepare() {
 		third_party/xcbproto
 		third_party/zxcvbn-cpp
 		third_party/zlib/google
-		tools/grit/third_party/six
 		url/third_party/mozilla
 		v8/src/third_party/siphash
 		v8/src/third_party/valgrind
@@ -679,6 +670,9 @@ src_configure() {
 	# Disable pseudolocales, only used for testing
 	myconf_gn+=" enable_pseudolocales=false"
 
+	# Disable code formating of generated files
+	myconf_gn+=" blink_enable_generated_code_formatting=false"
+
 	ffmpeg_branding="$(usex proprietary-codecs Chrome Chromium)"
 	myconf_gn+=" proprietary_codecs=$(usex proprietary-codecs true false)"
 	myconf_gn+=" ffmpeg_branding=\"${ffmpeg_branding}\""
@@ -770,9 +764,6 @@ src_configure() {
 		append-cxxflags -flax-vector-conversions
 	fi
 
-	# highway/libjxl fail on ppc64 without extra patches, disable for now.
-	use ppc64 && myconf_gn+=" enable_jxl_decoder=false"
-
 	# Disable unknown warning message from clang.
 	tc-is-clang && append-flags -Wno-unknown-warning-option
 
@@ -848,9 +839,8 @@ src_compile() {
 	# Calling this here supports resumption via FEATURES=keepwork
 	python_setup
 
-	# https://bugs.gentoo.org/717456
-	# don't inherit PYTHONPATH from environment, bug #789021
-	local -x PYTHONPATH="${WORKDIR}/setuptools-44.1.0"
+	# Don't inherit PYTHONPATH from environment, bug #789021, #812689
+	local -x PYTHONPATH=
 
 	#"${EPYTHON}" tools/clang/scripts/update.py --force-local-build --gcc-toolchain /usr --skip-checkout --use-system-cmake --without-android || die
 
