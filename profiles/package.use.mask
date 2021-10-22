@@ -1,5 +1,7 @@
 # From gentoo repository's chromium package
->=www-client/ungoogled-chromium-58.0.3026.3 system-libvpx
+>=www-client/ungoogled-chromium-94 system-ffmpeg
+>=www-client/ungoogled-chromium-84 headless
+www-client/ungoogled-chromium component-build
 
 # Adjustment for ungoogled-chromium build flags
 www-client/ungoogled-chromium hangouts js-type-check
