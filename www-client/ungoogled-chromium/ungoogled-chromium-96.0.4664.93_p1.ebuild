@@ -22,15 +22,16 @@ DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET="4"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
+PPC64LE_PATCHSET="1"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
+	ppc64? ( https://dev.gentoo.org/~gyakovlev/distfiles/${C_PN}-$(ver_cut 1)-ppc64le-${PPC64LE_PATCHSET}.tar.xz )
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
 
 LICENSE="BSD"
 SLOT="0/stable"
-KEYWORDS="amd64 ~arm64 ~x86"
-IUSE="component-build cups custom-cflags cpu_flags_arm_neon debug +hangouts headless +js-type-check kerberos +official pic +proprietary-codecs pulseaudio screencast selinux +suid +system-ffmpeg +system-harfbuzz +system-icu vaapi wayland
-widevine"
+KEYWORDS="amd64 arm64 ~x86"
+IUSE="component-build cups custom-cflags cpu_flags_arm_neon debug +hangouts headless +js-type-check kerberos +official pic +proprietary-codecs pulseaudio screencast selinux +suid +system-ffmpeg +system-harfbuzz +system-icu vaapi wayland +widevine"
 
 REQUIRED_USE="
 	component-build? ( !suid )
@@ -124,7 +125,6 @@ BDEPEND="
 	>=dev-util/gperf-3.0.3
 	>=dev-util/ninja-1.7.2
 	>=net-libs/nodejs-7.6.0[inspector]
-	sys-apps/hwids[usb(+)]
 	>=sys-devel/bison-2.4.3
 	sys-devel/flex
 	virtual/pkgconfig
@@ -260,11 +260,12 @@ src_prepare() {
 		"${FILESDIR}/chromium-93-InkDropHost-crash.patch"
 		"${FILESDIR}/chromium-96-EnumTable-crash.patch"
 		"${FILESDIR}/chromium-96-freetype-unbundle.patch"
-		"${FILESDIR}/chromium-96-xfce-maximize.patch"
 		"${FILESDIR}/chromium-glibc-2.34.patch"
 		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
 		"${FILESDIR}/chromium-shim_headers.patch"
 	)
+
+	use ppc64 && PATCHES+=( "${WORKDIR}/${PN}-ppc64le" )
 
 	default
 
@@ -762,6 +763,9 @@ src_configure() {
 	# Chromium relies on this, but was disabled in >=clang-10, crbug.com/1042470
 	append-cxxflags $(test-flags-CXX -flax-vector-conversions=all)
 
+	# highway/libjxl fail on ppc64 without extra patches, disable for now.
+	use ppc64 && myconf_gn+=" enable_jxl_decoder=false"
+
 	# Disable unknown warning message from clang.
 	tc-is-clang && append-flags -Wno-unknown-warning-option
 
@@ -878,6 +882,11 @@ src_compile() {
 		s|\(^Exec=\)/usr/bin/|\1|g;' \
 		chrome/installer/linux/common/desktop.template > \
 		out/Release/chromium-browser-chromium.desktop || die
+
+	# Build vk_swiftshader_icd.json; bug #827861
+	sed -e 's|${ICD_LIBRARY_PATH}|./libvk_swiftshader.so|g' \
+		third_party/swiftshader/src/Vulkan/vk_swiftshader_icd.json.tmpl > \
+		out/Release/vk_swiftshader_icd.json || die
 }
 
 src_install() {
@@ -934,6 +943,9 @@ src_install() {
 
 	doins -r out/Release/locales
 	doins -r out/Release/resources
+
+	# Install vk_swiftshader_icd.json; bug #827861
+	doins out/Release/vk_swiftshader_icd.json
 
 	if [[ -d out/Release/swiftshader ]]; then
 		insinto "${CHROMIUM_HOME}/swiftshader"
