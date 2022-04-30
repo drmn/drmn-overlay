@@ -27,7 +27,7 @@ SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_
 
 LICENSE="BSD"
 SLOT="0/beta"
-KEYWORDS="amd64 ~rm64 ~x86"
+KEYWORDS="amd64 arm64 ~x86"
 IUSE="component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless +js-type-check kerberos libcxx +official pic +proprietary-codecs pulseaudio screencast selinux +suid +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
 
 REQUIRED_USE="
