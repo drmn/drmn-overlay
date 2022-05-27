@@ -814,11 +814,6 @@ src_configure() {
 		fi
 	fi
 
-	# Required to compile ungoogled-chromium-101.
-	append-cxxflags $(test-flags-CXX -fdata-sections)
-	append-cxxflags $(test-flags-CXX -ffunction-sections)
-	append-ldflags -Wl,--gc-sections
-
 	# Explicitly disable ICU data file support for system-icu/headless builds.
 	if use system-icu || use headless; then
 		myconf_gn+=" icu_use_data_file=false"
