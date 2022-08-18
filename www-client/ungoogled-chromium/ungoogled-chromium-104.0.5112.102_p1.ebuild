@@ -26,11 +26,11 @@ PATCHSET="2"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
+	pgo? ( https://blackhole.sk/~kabel/src/chromium-profiler-0.1.tar )
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
 
-
 LICENSE="BSD"
-SLOT="0/beta"
+SLOT="0/stable"
 KEYWORDS="amd64 arm64"
 IUSE="+X component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless +js-type-check kerberos libcxx lto +official pic +proprietary-codecs pulseaudio screencast selinux +suid +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
 REQUIRED_USE="
@@ -165,11 +165,11 @@ BDEPEND="
 	')
 	>=app-arch/gzip-1.7
 	libcxx? ( >=sys-devel/clang-12 )
-	lto? ( $(depend_clang_llvm_versions 12 13 14) )
+	lto? ( $(depend_clang_llvm_versions 13 14) )
 	pgo? (
 		>=dev-python/selenium-3.141.0
 		>=dev-util/web_page_replay_go-20220314
-		$(depend_clang_llvm_versions 12 13 14)
+		$(depend_clang_llvm_versions 13 14)
 	)
 	dev-lang/perl
 	>=dev-util/gn-0.1807
@@ -224,7 +224,7 @@ in /etc/chromium/default.
 "
 
 python_check_deps() {
-	has_version -b "dev-python/setuptools[${PYTHON_USEDEP}]"
+	python_has_version "dev-python/setuptools[${PYTHON_USEDEP}]"
 }
 
 needs_clang() {
