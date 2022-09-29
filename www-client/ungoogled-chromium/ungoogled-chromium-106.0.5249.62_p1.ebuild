@@ -2,8 +2,8 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
-PYTHON_COMPAT=( python3_{8..10} )
-PYTHON_REQ_USE="xml"
+PYTHON_COMPAT=( python3_{8..11} )
+PYTHON_REQ_USE="xml(+)"
 LLVM_MAX_SLOT=14
 
 CHROMIUM_LANGS="af am ar bg bn ca cs da de el en-GB es es-419 et fa fi fil fr gu he
@@ -22,7 +22,7 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET="1"
+PATCHSET="3"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
@@ -165,11 +165,11 @@ BDEPEND="
 	')
 	>=app-arch/gzip-1.7
 	libcxx? ( >=sys-devel/clang-12 )
-	lto? ( $(depend_clang_llvm_versions 13 14) )
+	lto? ( $(depend_clang_llvm_versions 13 14 15) )
 	pgo? (
 		>=dev-python/selenium-3.141.0
 		>=dev-util/web_page_replay_go-20220314
-		$(depend_clang_llvm_versions 13 14)
+		$(depend_clang_llvm_versions 13 14 15)
 	)
 	dev-lang/perl
 	>=dev-util/gn-0.1807
@@ -338,8 +338,8 @@ src_prepare() {
 		"${FILESDIR}/chromium-93-InkDropHost-crash.patch"
 		"${FILESDIR}/chromium-98-EnumTable-crash.patch"
 		"${FILESDIR}/chromium-98-gtk4-build.patch"
-		"${FILESDIR}/chromium-104-tflite-system-zlib.patch"
 		"${FILESDIR}/chromium-105-swiftshader-no-wayland.patch"
+		"${FILESDIR}/chromium-106-python3_11.patch"
 		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
 		"${FILESDIR}/chromium-shim_headers.patch"
 		"${FILESDIR}/chromium-cross-compile.patch"
@@ -383,6 +383,7 @@ src_prepare() {
 		third_party/apple_apsl
 		third_party/axe-core
 		third_party/blink
+		third_party/bidimapper
 		third_party/boringssl
 		third_party/boringssl/src/third_party/fiat
 		third_party/breakpad
@@ -459,6 +460,7 @@ src_prepare() {
 		third_party/hunspell
 		third_party/iccjpeg
 		third_party/inspector_protocol
+		third_party/ipcz
 		third_party/jinja2
 		third_party/jsoncpp
 		third_party/jstemplate
