@@ -4,7 +4,7 @@
 EAPI=8
 PYTHON_COMPAT=( python3_{8..11} )
 PYTHON_REQ_USE="xml(+)"
-LLVM_MAX_SLOT=14
+LLVM_MAX_SLOT=15
 
 CHROMIUM_LANGS="af am ar bg bn ca cs da de el en-GB es es-419 et fa fi fil fr gu he
 	hi hr hu id it ja kn ko lt lv ml mr ms nb nl pl pt-BR pt-PT ro ru sk sl sr
@@ -22,7 +22,7 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET="3"
+PATCHSET="1"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
@@ -32,7 +32,7 @@ SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_
 LICENSE="BSD"
 SLOT="0/stable"
 KEYWORDS="amd64 arm64"
-IUSE="+X component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless +js-type-check kerberos libcxx lto +official pic +proprietary-codecs pulseaudio screencast selinux +suid +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
+IUSE="+X component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless +js-type-check kerberos libcxx lto +official pgo pic +proprietary-codecs pulseaudio qt5 screencast selinux +suid +system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
 REQUIRED_USE="
 	component-build? ( !suid !libcxx )
 	screencast? ( wayland )
@@ -63,10 +63,14 @@ COMMON_SNAPSHOT_DEPEND="
 	>=media-libs/freetype-2.11.0-r1:=
 	system-harfbuzz? ( >=media-libs/harfbuzz-3:0=[icu(-)] )
 	media-libs/libjpeg-turbo:=
-	system-png? ( media-libs/libpng:=[-apng] )
+	system-png? ( media-libs/libpng:=[-apng(-)] )
 	>=media-libs/libwebp-0.4.0:=
 	media-libs/mesa:=[gbm(+)]
 	>=media-libs/openh264-1.6.0:=
+	system-av1? (
+		>=media-libs/dav1d-1.0.0:=
+		>=media-libs/libaom-3.4.0:=
+	)
 	sys-libs/zlib:=
 	x11-libs/libdrm:=
 	!headless? (
@@ -75,7 +79,7 @@ COMMON_SNAPSHOT_DEPEND="
 		pulseaudio? ( media-sound/pulseaudio:= )
 		sys-apps/pciutils:=
 		kerberos? ( virtual/krb5 )
-		vaapi? ( >=x11-libs/libva-2.7:=[X?,wayland?] )
+		vaapi? ( >=media-libs/libva-2.7:=[X?,wayland?] )
 		X? (
 			x11-libs/libX11:=
 			x11-libs/libXext:=
@@ -107,15 +111,20 @@ COMMON_DEPEND="
 	sys-libs/zlib:=[minizip]
 	!headless? (
 		X? ( ${COMMON_X_DEPEND} )
-		>=app-accessibility/at-spi2-atk-2.26:2
-		>=app-accessibility/at-spi2-core-2.26:2
-		>=dev-libs/atk-2.26
+		|| (
+			>=app-accessibility/at-spi2-core-2.46.0:2
+			( app-accessibility/at-spi2-atk dev-libs/atk )
+		)
 		media-libs/mesa:=[X?,wayland?]
 		cups? ( >=net-print/cups-1.3.11:= )
 		virtual/udev
 		x11-libs/cairo:=
 		x11-libs/gdk-pixbuf:2
 		x11-libs/pango:=
+		qt5? (
+			dev-qt/qtcore:5
+			dev-qt/qtwidgets:5
+		)
 	)
 "
 RDEPEND="${COMMON_DEPEND}
@@ -339,8 +348,8 @@ src_prepare() {
 		"${FILESDIR}/chromium-98-EnumTable-crash.patch"
 		"${FILESDIR}/chromium-98-gtk4-build.patch"
 		"${FILESDIR}/chromium-105-swiftshader-no-wayland.patch"
-		"${FILESDIR}/chromium-106-python3_11.patch"
 		"${FILESDIR}/chromium-106-revert-GlobalMediaControlsCastStartStop.patch"
+		"${FILESDIR}/chromium-107-system-zlib.patch"
 		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
 		"${FILESDIR}/chromium-shim_headers.patch"
 		"${FILESDIR}/chromium-cross-compile.patch"
@@ -414,7 +423,6 @@ src_prepare() {
 		third_party/crashpad/crashpad/third_party/zlib
 		third_party/crc32c
 		third_party/cros_system_api
-		third_party/dav1d
 		third_party/dawn
 		third_party/dawn/third_party/gn/webgpu-cts
 		third_party/dawn/third_party/khronos
@@ -468,10 +476,6 @@ src_prepare() {
 		third_party/khronos
 		third_party/leveldatabase
 		third_party/libaddressinput
-		third_party/libaom
-		third_party/libaom/source/libaom/third_party/fastfeat
-		third_party/libaom/source/libaom/third_party/vector
-		third_party/libaom/source/libaom/third_party/x86inc
 		third_party/libavif
 		third_party/libevent
 		third_party/libgav1
@@ -507,7 +511,7 @@ src_prepare() {
 		third_party/nearby
 		third_party/neon_2_sse
 		third_party/node
-		third_party/node/node_modules/polymer-bundler/lib/third_party/UglifyJS2
+		third_party/omnibox_proto
 		third_party/one_euro_filter
 		third_party/openscreen
 		third_party/openscreen/src/third_party/mozilla
@@ -541,9 +545,7 @@ src_prepare() {
 		third_party/shell-encryption
 		third_party/simplejson
 		third_party/skia
-		third_party/skia/include/third_party/skcms
 		third_party/skia/include/third_party/vulkan
-		third_party/skia/third_party/skcms
 		third_party/skia/third_party/vulkan
 		third_party/smhasher
 		third_party/snappy
@@ -604,6 +606,15 @@ src_prepare() {
 	fi
 	if ! use system-png; then
 		keeplibs+=( third_party/libpng )
+	fi
+	if ! use system-av1; then
+		keeplibs+=(
+			third_party/dav1d
+			third_party/libaom
+			third_party/libaom/source/libaom/third_party/fastfeat
+			third_party/libaom/source/libaom/third_party/vector
+			third_party/libaom/source/libaom/third_party/x86inc
+		)
 	fi
 	if use libcxx; then
 		keeplibs+=( third_party/re2 )
@@ -763,6 +774,9 @@ chromium_configure() {
 	if use system-png; then
 		gn_system_libraries+=( libpng )
 	fi
+	if use system-av1; then
+		gn_system_libraries+=( dav1d libaom )
+	fi
 	# re2 library interface relies on std::string and std::vector
 	if ! use libcxx; then
 		gn_system_libraries+=( re2 )
@@ -916,7 +930,7 @@ chromium_configure() {
 	myconf_gn+=" ozone_platform_headless=true"
 	if use headless; then
 		myconf_gn+=" ozone_platform=\"headless\""
-		myconf_gn+=" use_xkbcommon=false use_gtk=false"
+		myconf_gn+=" use_xkbcommon=false use_gtk=false use_qt=false"
 		myconf_gn+=" use_glib=false use_gio=false"
 		myconf_gn+=" use_pangocairo=false use_alsa=false"
 		myconf_gn+=" use_libpci=false use_udev=false"
@@ -926,10 +940,14 @@ chromium_configure() {
 		myconf_gn+=" use_system_libdrm=true"
 		myconf_gn+=" use_system_minigbm=true"
 		myconf_gn+=" use_xkbcommon=true"
+		myconf_gn+=" use_qt=$(usex qt5 true false)"
 		myconf_gn+=" ozone_platform_x11=$(usex X true false)"
 		myconf_gn+=" ozone_platform_wayland=$(usex wayland true false)"
 		myconf_gn+=" ozone_platform=$(usex wayland \"wayland\" \"x11\")"
-		use wayland && myconf_gn+=" use_system_wayland_scanner=true"
+		if use wayland; then
+			myconf_gn+=" use_system_libwayland_server=true"
+			myconf_gn+=" use_system_wayland_scanner=true"
+		fi
 	fi
 
 	# Results in undefined references in chrome linking, may require CFI to work
@@ -965,6 +983,11 @@ chromium_configure() {
 	if use arm64 && tc-is-gcc; then
 		sed -i '/^#if HAVE_ARM64_CRC32C/a #pragma GCC target ("+crc+crypto")' \
 			third_party/crc32c/src/src/crc32c_arm64.cc || die
+	fi
+
+	# skipping typecheck is only supported on amd64, bug #876157
+	if ! use amd64; then
+		myconf_gn+=" devtools_skip_typecheck=false"
 	fi
 
 	# ungoogled-chromium flags
