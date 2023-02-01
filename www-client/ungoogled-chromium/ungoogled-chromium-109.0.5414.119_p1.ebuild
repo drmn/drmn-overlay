@@ -2,7 +2,7 @@
 # Distributed under the terms of the GNU General Public License v2
 
 EAPI=8
-PYTHON_COMPAT=( python3_{8..11} )
+PYTHON_COMPAT=( python3_{9..11} )
 PYTHON_REQ_USE="xml(+)"
 LLVM_MAX_SLOT=15
 
@@ -25,14 +25,20 @@ DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET="1"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
+PATCHSET_URI_PPC64="https://quickbuild.io/~raptor-engineering-public"
+PATCHSET_NAME_PPC64="chromium_109.0.5414.74-2raptor0~deb11u1.debian"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
+	ppc64? (
+		${PATCHSET_URI_PPC64}/+archive/ubuntu/chromium/+files/${PATCHSET_NAME_PPC64}.tar.xz
+		https://dev.gentoo.org/~sultan/distfiles/www-client/chromium/chromium-ppc64le-gentoo-patches-1.tar.xz
+	)
 	pgo? ( https://github.com/elkablo/chromium-profiler/releases/download/v0.2/chromium-profiler-0.2.tar )
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
 
 LICENSE="BSD"
 SLOT="0/stable"
-KEYWORDS="amd64 arm64"
+KEYWORDS="amd64 arm64 ~ppc64"
 IUSE="+X component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless +js-type-check kerberos libcxx lto +official pgo pic +proprietary-codecs pulseaudio qt5 screencast selinux +suid +system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
 REQUIRED_USE="
 	component-build? ( !suid !libcxx )
@@ -273,6 +279,10 @@ pre_build_checks() {
 			if ! ver_test "$(clang-major-version)" -ge 13; then
 				die "At least clang 13 is required"
 			fi
+			# bug #889374
+			if ! use libcxx; then
+				die "Builds using clang fail with USE=-libcxx"
+			fi
 		fi
 		if [[ ${EBUILD_PHASE_FUNC} == pkg_setup ]] && use js-type-check; then
 			"${BROOT}"/usr/bin/java -version 2>1 > /dev/null || die "Java VM not setup correctly"
@@ -354,7 +364,7 @@ src_prepare() {
 	# disable global media controls, crashes with libstdc++
 	sed -i -e \
 		"/\"GlobalMediaControlsCastStartStop\",/{n;s/ENABLED/DISABLED/;}" \
-		"third_party/blink/common/features.cc" || die
+		"chrome/browser/media/router/media_router_feature.cc" || die
 
 	local PATCHES=(
 		"${WORKDIR}/patches"
@@ -363,10 +373,22 @@ src_prepare() {
 		"${FILESDIR}/chromium-108-EnumTable-crash.patch"
 		"${FILESDIR}/chromium-109-system-zlib.patch"
 		"${FILESDIR}/chromium-109-system-openh264.patch"
+		"${FILESDIR}/chromium-109-system-icu.patch"
+		"${FILESDIR}/chromium-109-v8-icu72.patch"
 		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
 		"${FILESDIR}/chromium-shim_headers.patch"
 		"${FILESDIR}/chromium-cross-compile.patch"
 	)
+
+	if use ppc64 ; then
+		local p
+		for p in $(grep -v "^#" "${WORKDIR}"/debian/patches/series | grep "^ppc64le" || die); do
+			if [[ ! $p =~ "fix-breakpad-compile.patch" ]]; then
+				eapply "${WORKDIR}/debian/patches/${p}"
+			fi
+		done
+		PATCHES+=( "${WORKDIR}/ppc64le" )
+	fi
 
 	default
 
