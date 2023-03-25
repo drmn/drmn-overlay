@@ -23,17 +23,22 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET="4"
+PATCHSET="2"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
+PATCHSET_URI_PPC64="https://quickbuild.io/~raptor-engineering-public"
+PATCHSET_NAME_PPC64="chromium_111.0.5563.64-1raptor0~deb11u1.debian"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
+	ppc64? (
+		${PATCHSET_URI_PPC64}/+archive/ubuntu/chromium/+files/${PATCHSET_NAME_PPC64}.tar.xz
+		https://dev.gentoo.org/~sultan/distfiles/www-client/chromium/chromium-ppc64le-gentoo-patches-1.tar.xz
+	)
 	pgo? ( https://github.com/elkablo/chromium-profiler/releases/download/v0.2/chromium-profiler-0.2.tar )
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
-
 LICENSE="BSD"
 SLOT="0/stable"
-KEYWORDS="amd64 arm64"
-IUSE="+X component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless +js-type-check kerberos libcxx lto +official pgo pic +proprietary-codecs pulseaudio qt5 screencast selinux +suid +system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
+KEYWORDS="amd64 arm64 ~ppc64"
+IUSE="+X component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless kerberos libcxx lto +official pax-kernel pgo pic +proprietary-codecs pulseaudio qt5 screencast selinux +suid +system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
 REQUIRED_USE="
 	component-build? ( !suid !libcxx )
 	screencast? ( wayland )
@@ -132,7 +137,6 @@ RDEPEND="${COMMON_DEPEND}
 			gui-libs/gtk:4[X?,wayland?]
 		)
 		qt5? ( dev-qt/qtgui:5[X?,wayland?] )
-		x11-misc/xdg-utils
 	)
 	virtual/ttf-fonts
 	selinux? ( sec-policy/selinux-chromium )
@@ -176,11 +180,11 @@ BDEPEND="
 		qt5? ( dev-qt/qtcore:5 )
 	)
 	libcxx? ( >=sys-devel/clang-13 )
-	lto? ( $(depend_clang_llvm_versions 13 14 15) )
+	lto? ( $(depend_clang_llvm_versions 14 15) )
 	pgo? (
 		>=dev-python/selenium-3.141.0
 		>=dev-util/web_page_replay_go-20220314
-		$(depend_clang_llvm_versions 13 14 15)
+		$(depend_clang_llvm_versions 14 15)
 	)
 	dev-lang/perl
 	>=dev-util/gn-0.1807
@@ -191,7 +195,6 @@ BDEPEND="
 	>=sys-devel/bison-2.4.3
 	sys-devel/flex
 	virtual/pkgconfig
-	js-type-check? ( virtual/jre )
 "
 
 # These are intended for ebuild maintainer use to force clang if GCC is broken.
@@ -257,32 +260,6 @@ llvm_check_deps() {
 }
 
 pre_build_checks() {
-	if [[ ${MERGE_TYPE} != binary ]]; then
-		[[ ${EBUILD_PHASE_FUNC} == pkg_setup ]] && ( use lto || use pgo ) && llvm_pkg_setup
-
-		local -x CPP="$(tc-getCXX) -E"
-		if tc-is-gcc && ! ver_test "$(gcc-version)" -ge 10.4; then
-			die "At least gcc 10.4 is required"
-		fi
-		if use pgo && tc-is-cross-compiler; then
-			die "The pgo USE flag cannot be used when cross-compiling"
-		fi
-		if needs_clang || tc-is-clang; then
-			tc-is-cross-compiler && CPP=${CBUILD}-clang++ || CPP=${CHOST}-clang++
-			CPP+=" -E"
-			if ! ver_test "$(clang-major-version)" -ge 13; then
-				die "At least clang 13 is required"
-			fi
-			# bug #889374
-			if ! use libcxx; then
-				die "Builds using clang fail with USE=-libcxx"
-			fi
-		fi
-		if [[ ${EBUILD_PHASE_FUNC} == pkg_setup ]] && use js-type-check; then
-			"${BROOT}"/usr/bin/java -version 2>1 > /dev/null || die "Java VM not setup correctly"
-		fi
-	fi
-
 	# Check build requirements, bug #541816 and bug #471810 .
 	CHECKREQS_MEMORY="4G"
 	CHECKREQS_DISK_BUILD="12G"
@@ -316,7 +293,31 @@ pkg_pretend() {
 }
 
 pkg_setup() {
+	if use lto || use pgo; then
+		llvm_pkg_setup
+	fi
+
 	pre_build_checks
+
+	if [[ ${MERGE_TYPE} != binary ]]; then
+		local -x CPP="$(tc-getCXX) -E"
+		if tc-is-gcc && ! ver_test "$(gcc-version)" -ge 10.4; then
+			die "At least gcc 10.4 is required"
+		fi
+		if use pgo && tc-is-cross-compiler; then
+			die "The pgo USE flag cannot be used when cross-compiling"
+		fi
+		if needs_clang && ! tc-is-clang; then
+			if tc-is-cross-compiler; then
+				CPP="${CBUILD}-clang++ -E"
+			else
+				CPP="${CHOST}-clang++ -E"
+			fi
+			if ! ver_test "$(clang-major-version)" -ge 13; then
+				die "At least clang 13 is required"
+			fi
+		fi
+	fi
 
 	chromium_suid_sandbox_check_kernel_config
 
@@ -353,16 +354,18 @@ src_prepare() {
 		"/\"GlobalMediaControlsCastStartStop\",/{n;s/ENABLED/DISABLED/;}" \
 		"chrome/browser/media/router/media_router_feature.cc" || die
 
+	rm "${WORKDIR}"/patches/chromium-110-dpf-arm64.patch || die
+	rm "${WORKDIR}"/patches/chromium-111-v8-std-layout1.patch || die
+	rm "${WORKDIR}"/patches/chromium-111-v8-std-layout2.patch || die
+
 	local PATCHES=(
 		"${WORKDIR}/patches"
-		"${FILESDIR}/chromium-93-InkDropHost-crash.patch"
 		"${FILESDIR}/chromium-98-gtk4-build.patch"
 		"${FILESDIR}/chromium-108-EnumTable-crash.patch"
 		"${FILESDIR}/chromium-109-system-zlib.patch"
 		"${FILESDIR}/chromium-109-system-openh264.patch"
-		"${FILESDIR}/chromium-109-system-icu.patch"
+		"${FILESDIR}/chromium-111-ozone-platform.patch"
 		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
-		"${FILESDIR}/chromium-shim_headers.patch"
 		"${FILESDIR}/chromium-cross-compile.patch"
 	)
 
@@ -397,7 +400,9 @@ src_prepare() {
 		third_party/abseil-cpp
 		third_party/angle
 		third_party/angle/src/common/third_party/xxhash
+		third_party/angle/src/third_party/ceval
 		third_party/angle/src/third_party/libXNVCtrl
+		third_party/angle/src/third_party/systeminfo
 		third_party/angle/src/third_party/volk
 		third_party/apple_apsl
 		third_party/axe-core
@@ -452,6 +457,7 @@ src_prepare() {
 		third_party/devtools-frontend/src/front_end/third_party/marked
 		third_party/devtools-frontend/src/front_end/third_party/puppeteer
 		third_party/devtools-frontend/src/front_end/third_party/puppeteer/package/lib/esm/third_party/mitt
+		third_party/devtools-frontend/src/front_end/third_party/vscode.web-custom-data
 		third_party/devtools-frontend/src/front_end/third_party/wasmparser
 		third_party/devtools-frontend/src/test/unittests/front_end/third_party/i18n
 		third_party/devtools-frontend/src/third_party
@@ -511,6 +517,7 @@ src_prepare() {
 		third_party/maldoca/src/third_party/tensorflow_protos
 		third_party/maldoca/src/third_party/zlibwrapper
 		third_party/markupsafe
+		third_party/material_color_utilities
 		third_party/mesa
 		third_party/metrics_proto
 		third_party/minigbm
@@ -542,7 +549,6 @@ src_prepare() {
 		third_party/private-join-and-compute
 		third_party/private_membership
 		third_party/protobuf
-		third_party/protobuf/third_party/six
 		third_party/pthreadpool
 		third_party/pyjson5
 		third_party/pyyaml
@@ -658,10 +664,6 @@ src_prepare() {
 	# Remove most bundled libraries. Some are still needed.
 	build/linux/unbundle/remove_bundled_libraries.py "${keeplibs[@]}" --do-remove || die
 
-	if use js-type-check; then
-		ln -s "${EPREFIX}"/usr/bin/java third_party/jdk/current/bin/java || die
-	fi
-
 	# bundled eu-strip is for amd64 only and we don't want to pre-stripped binaries
 	mkdir -p buildtools/third_party/eu-strip/bin || die
 	ln -s "${EPREFIX}"/bin/true buildtools/third_party/eu-strip/bin/eu-strip || die
@@ -735,6 +737,15 @@ chromium_configure() {
 		myconf_gn+=" host_toolchain=\"//build/toolchain/linux/unbundle:default\""
 	fi
 
+	# Create dummy pkg-config file for libsystemd, only dependency of installer
+	mkdir "${T}/libsystemd" || die
+	cat <<- EOF > "${T}/libsystemd/libsystemd.pc"
+		Name:
+		Description:
+		Version:
+	EOF
+	local -x PKG_CONFIG_PATH="${PKG_CONFIG_PATH:+"${PKG_CONFIG_PATH}:"}${T}/libsystemd"
+
 	# GN needs explicit config for Debug/Release as opposed to inferring it from build directory.
 	myconf_gn+=" is_debug=false"
 
@@ -796,7 +807,7 @@ chromium_configure() {
 	myconf_gn+=" use_gnome_keyring=false"
 
 	# Optional dependencies.
-	myconf_gn+=" enable_js_type_check=$(usex js-type-check true false)"
+	myconf_gn+=" enable_js_type_check=false"
 	myconf_gn+=" enable_hangout_services_extension=$(usex hangouts true false)"
 	myconf_gn+=" enable_widevine=$(usex widevine true false)"
 
@@ -1052,16 +1063,18 @@ chromium_compile() {
 	local -x PYTHONPATH=
 
 	# Build mksnapshot and pax-mark it.
-	local x
-	for x in mksnapshot v8_context_snapshot_generator; do
-		if tc-is-cross-compiler; then
-			eninja -C out/Release "host/${x}"
-			pax-mark m "out/Release/host/${x}"
-		else
-			eninja -C out/Release "${x}"
-			pax-mark m "out/Release/${x}"
-		fi
-	done
+	if use pax-kernel; then
+		local x
+		for x in mksnapshot v8_context_snapshot_generator; do
+			if tc-is-cross-compiler; then
+				eninja -C out/Release "host/${x}"
+				pax-mark m "out/Release/host/${x}"
+			else
+				eninja -C out/Release "${x}"
+				pax-mark m "out/Release/${x}"
+			fi
+		done
+	fi
 
 	# Even though ninja autodetects number of CPUs, we respect
 	# user's options, for debugging with -j 1 or any other reason.
@@ -1192,6 +1205,9 @@ src_install() {
 		local files=(out/Release/*.so out/Release/*.so.[0-9])
 		[[ ${#files[@]} -gt 0 ]] && doins "${files[@]}"
 	)
+
+	# Install bundled xdg-utils, avoids installing X11 libraries with USE="-X wayland"
+	doins out/Release/xdg-{settings,mime}
 
 	if ! use system-icu && ! use headless; then
 		doins out/Release/icudtl.dat
