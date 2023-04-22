@@ -24,7 +24,7 @@ S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET_URI_PPC64="https://quickbuild.io/~raptor-engineering-public"
-PATCHSET_NAME_PPC64="chromium_111.0.5563.64-1raptor0~deb11u1.debian"
+PATCHSET_NAME_PPC64="chromium_112.0.5615.138-1raptor0~deb11u2.debian"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	ppc64? (
 		${PATCHSET_URI_PPC64}/+archive/ubuntu/chromium/+files/${PATCHSET_NAME_PPC64}.tar.xz
@@ -34,7 +34,7 @@ SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
 LICENSE="BSD"
 SLOT="0/stable"
-KEYWORDS="amd64 arm64"
+KEYWORDS="amd64 arm64 ~ppc64"
 IUSE="+X component-build cups cpu_flags_arm_neon debug gtk4 +hangouts headless kerberos libcxx lto +official pax-kernel pgo pic +proprietary-codecs pulseaudio qt5 screencast selinux +suid +system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland widevine"
 IUSE="+X component-build cups custom-cflags pu_flags_arm_neon debug gtk4 +hangouts headless kerberos libcxx lto +official pax-kernel pgo pic +proprietary-codecs pulseaudio qt5 screencast selinux +suid +system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
 REQUIRED_USE="
@@ -364,6 +364,8 @@ src_prepare() {
 		"${FILESDIR}/chromium-112-compiler.patch"
 		"${FILESDIR}/chromium-112-libstdc++.patch"
 		"${FILESDIR}/chromium-112-libstdc++-1.patch"
+		"${FILESDIR}/chromium-112-sql-relax.patch"
+		"${FILESDIR}/chromium-112-gcc-mno-outline.patch"
 	)
 
 	if use ppc64 ; then
