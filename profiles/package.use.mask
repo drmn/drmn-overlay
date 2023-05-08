@@ -1,4 +1,6 @@
 # From gentoo repository's chromium package
+>=www-client/ungoogled-chromium-113 system-av1
+>=www-client/ungoogled-chromium-104 pgo
 >=www-client/ungoogled-chromium-94 system-ffmpeg
 >=www-client/ungoogled-chromium-84 headless
 www-client/ungoogled-chromium component-build
