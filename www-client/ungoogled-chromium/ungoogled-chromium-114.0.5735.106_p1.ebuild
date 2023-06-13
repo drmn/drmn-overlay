@@ -3,7 +3,7 @@
 
 EAPI=8
 
-PYTHON_COMPAT=( python3_{9..11} )
+PYTHON_COMPAT=( python3_{10..11} )
 PYTHON_REQ_USE="xml(+)"
 LLVM_MAX_SLOT=16
 
@@ -25,7 +25,7 @@ S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET_URI_PPC64="https://quickbuild.io/~raptor-engineering-public"
-PATCHSET_NAME_PPC64="chromium_113.0.5672.63-2raptor0~deb11u1.debian"
+PATCHSET_NAME_PPC64="chromium_114.0.5735.106-1raptor0~deb11u1.debian"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://dev.gentoo.org/~sam/distfiles/www-client/chromium/chromium-112-gcc-13-patches.tar.xz
 	ppc64? (
@@ -34,10 +34,12 @@ SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_
 	)
 	pgo? ( https://github.com/elkablo/chromium-profiler/releases/download/v0.2/chromium-profiler-0.2.tar )
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
+
 LICENSE="BSD"
 SLOT="0/stable"
 KEYWORDS="amd64 arm64 ~ppc64"
 IUSE="+X component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless kerberos libcxx lto +official pax-kernel pgo pic +proprietary-codecs pulseaudio qt5 screencast selinux +suid +system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png vaapi wayland +widevine"
+
 REQUIRED_USE="
 	component-build? ( !suid !libcxx )
 	screencast? ( wayland )
@@ -300,8 +302,8 @@ pkg_setup() {
 
 	if [[ ${MERGE_TYPE} != binary ]]; then
 		local -x CPP="$(tc-getCXX) -E"
-		if tc-is-gcc && ! ver_test "$(gcc-version)" -ge 10.4; then
-			die "At least gcc 10.4 is required"
+		if tc-is-gcc && ! ver_test "$(gcc-version)" -ge 12; then
+			die "At least gcc 12 is required"
 		fi
 		if use pgo && tc-is-cross-compiler; then
 			die "The pgo USE flag cannot be used when cross-compiling"
@@ -320,11 +322,6 @@ pkg_setup() {
 
 	chromium_suid_sandbox_check_kernel_config
 
-	# nvidia-drivers does not work correctly with Wayland due to unsupported EGLStreams
-	if use wayland && ! use headless && has_version "x11-drivers/nvidia-drivers"; then
-		ewarn "Proprietary nVidia driver does not work with Wayland. You can disable"
-		ewarn "Wayland by setting DISABLE_OZONE_PLATFORM=true in /etc/chromium/default."
-	fi
 }
 
 src_unpack() {
@@ -341,6 +338,9 @@ src_prepare() {
 	# Apply ungoogled-chromum patches
 	cd ${WORKDIR}/${UC_P}
 
+	# This patch fails to build and not yet troubleshooted
+	sed -e '/add-flags-for-referrer-customization.patch/d' -i patches/series || die
+
 	python ./utils/prune_binaries.py build/src pruning.list || die
 	python ./utils/patches.py apply build/src patches || die
 	python ./utils/domain_substitution.py apply -r domain_regex.list -f domain_substitution.list -c build/domsubcache.tar.gz build/src || die
@@ -352,27 +352,42 @@ src_prepare() {
 	sed -i -e \
 		"/\"GlobalMediaControlsCastStartStop\",/{n;s/ENABLED/DISABLED/;}" \
 		"chrome/browser/media/router/media_router_feature.cc" || die
-
-	rm "${WORKDIR}/chromium-112-gcc-13-patches/chromium-112-gcc-13-0002-perfetto.patch" || die
-	rm "${WORKDIR}/chromium-112-gcc-13-patches/chromium-112-gcc-13-0012-webrtc-base64.patch" || die
-	rm "${WORKDIR}/chromium-112-gcc-13-patches/chromium-112-gcc-13-0013-quiche.patch" || die
+	# Tis lazy, but tidy this up in 115.
+	pushd "${WORKDIR}/chromium-112-gcc-13-patches/" || die
+		rm chromium-112-gcc-13-0002-perfetto.patch || die
+		rm chromium-112-gcc-13-0004-swiftshader.patch || die
+		rm chromium-112-gcc-13-0007-misc.patch || die
+		rm chromium-112-gcc-13-0008-dawn.patch || die
+		rm chromium-112-gcc-13-0009-base.patch || die
+		rm chromium-112-gcc-13-0010-components.patch || die
+		rm chromium-112-gcc-13-0011-s2cellid.patch || die
+		rm chromium-112-gcc-13-0012-webrtc-base64.patch || die
+		rm chromium-112-gcc-13-0013-quiche.patch || die
+		rm chromium-112-gcc-13-0015-net.patch || die
+		rm chromium-112-gcc-13-0016-cc-targetproperty.patch || die
+		rm chromium-112-gcc-13-0017-gpu_feature_info.patch || die
+		rm chromium-112-gcc-13-0018-encounteredsurfacetracker.patch || die
+		rm chromium-112-gcc-13-0019-documentattachmentinfo.patch  || die
+		rm chromium-112-gcc-13-0020-pdfium.patch || die
+		rm chromium-112-gcc-13-0021-gcc-copy-list-init-net-HostCache.patch || die
+		rm chromium-112-gcc-13-0022-gcc-ambiguous-ViewTransitionElementId-type.patch || die
+		rm chromium-112-gcc-13-0023-gcc-incomplete-type-v8-subtype.patch || die
+	popd || die
 
 	local PATCHES=(
-		#"${WORKDIR}/patches"
+		"${FILESDIR}/chromium-cross-compile.patch"
+		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
 		"${FILESDIR}/chromium-98-gtk4-build.patch"
 		"${FILESDIR}/chromium-108-EnumTable-crash.patch"
-		"${FILESDIR}/chromium-109-system-zlib.patch"
 		"${FILESDIR}/chromium-109-system-openh264.patch"
+		"${FILESDIR}/chromium-109-system-zlib.patch"
 		"${FILESDIR}/chromium-111-InkDropHost-crash.patch"
-		"${FILESDIR}/chromium-use-oauth2-client-switches-as-default.patch"
-		"${FILESDIR}/chromium-cross-compile.patch"
-		"${FILESDIR}/chromium-113-compiler.patch"
 		"${WORKDIR}/chromium-112-gcc-13-patches"
-		"${FILESDIR}/chromium-113-swiftshader-cstdint.patch"
-		"${FILESDIR}/chromium-113-system-zlib.patch"
-		"${FILESDIR}/chromium-113-web_view_impl-cstring.patch"
-		"${FILESDIR}/chromium-113-std-monospace.patch"
 		"${FILESDIR}/chromium-113-gcc-13-0001-vulkanmemoryallocator.patch"
+		"${FILESDIR}/chromium-113-swiftshader-cstdint.patch"
+		"${FILESDIR}/chromium-114-compiler.patch"
+		"${FILESDIR}/chromium-114-gcc12.patch"
+		"${FILESDIR}/chromium-114-sigsegv-dom.patch"
 	)
 
 	if use ppc64 ; then
@@ -600,7 +615,6 @@ src_prepare() {
 		third_party/utf
 		third_party/vulkan
 		third_party/wayland
-		third_party/web-animations-js
 		third_party/webdriver
 		third_party/webgpu-cts
 		third_party/webrtc
@@ -753,14 +767,8 @@ chromium_configure() {
 		myconf_gn+=" host_toolchain=\"//build/toolchain/linux/unbundle:default\""
 	fi
 
-	# Create dummy pkg-config file for libsystemd, only dependency of installer
-	mkdir "${T}/libsystemd" || die
-	cat <<- EOF > "${T}/libsystemd/libsystemd.pc"
-		Name:
-		Description:
-		Version:
-	EOF
-	local -x PKG_CONFIG_PATH="${PKG_CONFIG_PATH:+"${PKG_CONFIG_PATH}:"}${T}/libsystemd"
+	# Disable rust for now; it's only used for testing and we don't need the additional bdep
+	myconf_gn+=" enable_rust=false"
 
 	# GN needs explicit config for Debug/Release as opposed to inferring it from build directory.
 	myconf_gn+=" is_debug=false"
@@ -1043,11 +1051,9 @@ chromium_configure() {
 	#myconf_gn+=" clang_use_chrome_plugins=false"
 	#myconf_gn+=" disable_fieldtrial_testing_config=true"
 	#myconf_gn+=" enable_hangout_services_extension=false"
-	#myconf_gn+=" enable_js_type_check=false"
 	myconf_gn+=" enable_mdns=false"
 	myconf_gn+=" enable_mse_mpeg2ts_stream_parser=true"
 	#myconf_gn+=" enable_nacl=false"
-	myconf_gn+=" enable_one_click_signin=false"
 	myconf_gn+=" enable_reading_list=false"
 	myconf_gn+=" enable_remoting=false"
 	myconf_gn+=" enable_reporting=false"
