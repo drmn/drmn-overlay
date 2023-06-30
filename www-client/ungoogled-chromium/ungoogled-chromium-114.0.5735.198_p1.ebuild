@@ -338,9 +338,6 @@ src_prepare() {
 	# Apply ungoogled-chromum patches
 	cd ${WORKDIR}/${UC_P}
 
-	# This patch fails to build and not yet troubleshooted
-	sed -e '/add-flags-for-referrer-customization.patch/d' -i patches/series || die
-
 	python ./utils/prune_binaries.py build/src pruning.list || die
 	python ./utils/patches.py apply build/src patches || die
 	python ./utils/domain_substitution.py apply -r domain_regex.list -f domain_substitution.list -c build/domsubcache.tar.gz build/src || die
