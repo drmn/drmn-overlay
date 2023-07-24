@@ -27,7 +27,7 @@ HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET="2"
 PATCHSET_NAME="chromium-115-patchset-${PATCHSET}"
 PATCHSET_URI_PPC64="https://quickbuild.io/~raptor-engineering-public"
-PATCHSET_NAME_PPC64="chromium_114.0.5735.106-1raptor0~deb11u1.debian"
+PATCHSET_NAME_PPC64="chromium_115.0.5790.98-1raptor0~deb11u2.debian"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
 	ppc64? (
