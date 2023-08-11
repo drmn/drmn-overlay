@@ -1,7 +1,0 @@
-interface(`bumblebeed_stream_connect',`
-	gen_require(`
-		type bumblebeed_t, bumblebeed_var_run_t;
-	')
-
-	stream_connect_pattern($1, bumblebeed_var_run_t, bumblebeed_var_run_t, bumblebeed_t)
-')

@@ -1,9 +1,0 @@
-/etc/tlp.conf	--	gen_context(system_u:object_r:tlp_etc_t,s0)
-
-/etc/rc\.d/init\.d/tlp	--	gen_context(system_u:object_r:tlp_initrc_exec_t,s0)
-
-/usr/sbin/tlp	--	gen_context(system_u:object_r:tlp_exec_t,s0)
-
-/usr/share/tlp(/.*)*		gen_context(system_u:object_r:tlp_etc_t,s0)
-
-/run/tlp(/.*)?		gen_context(system_u:object_r:tlp_var_run_t,s0)
