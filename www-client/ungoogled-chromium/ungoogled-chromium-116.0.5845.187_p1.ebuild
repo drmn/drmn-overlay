@@ -26,7 +26,7 @@ DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET="2"
 PATCHSET_NAME="chromium-$(ver_cut 1)-patchset-${PATCHSET}"
-PATCHSET_PPC64="115.0.5790.102-1raptor0~deb11u2"
+PATCHSET_PPC64="116.0.5845.140-1raptor0~deb12u1"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://github.com/stha09/chromium-patches/releases/download/${PATCHSET_NAME}/${PATCHSET_NAME}.tar.xz
 	ppc64? (
