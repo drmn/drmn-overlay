@@ -26,7 +26,7 @@ DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET="2"
 PATCHSET_NAME="chromium-116-patchset-${PATCHSET}"
-PATCHSET_PPC64="116.0.5845.140-1raptor0~deb12u1"
+PATCHSET_PPC64="117.0.5938.62-1raptor0~deb12u1"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://gitlab.com/Matt.Jolly/chromium-patches/-/archive/${C_PV}/chromium-patches-${C_PV}.tar.bz2
 	ppc64? (
@@ -41,7 +41,6 @@ SLOT="0/stable"
 KEYWORDS="amd64 arm64 ~ppc64"
 IUSE_SYSTEM_LIBS="+system-av1 +system-ffmpeg +system-harfbuzz +system-icu +system-png +system-zstd"
 IUSE="+X ${IUSE_SYSTEM_LIBS} component-build cups custom-cflags cpu_flags_arm_neon debug gtk4 +hangouts headless kerberos libcxx lto +official pax-kernel pgo pic +proprietary-codecs pulseaudio qt5 qt6 screencast selinux +suid vaapi wayland +widevine"
-
 REQUIRED_USE="
 	component-build? ( !suid !libcxx )
 	screencast? ( wayland )
@@ -653,6 +652,10 @@ src_prepare() {
 
 	if ! use system-zstd; then
 		keeplibs+=( third_party/zstd )
+	fi
+
+	if use libcxx; then
+		keeplibs+=( third_party/libc++ )
 	fi
 
 	# Arch-specific
