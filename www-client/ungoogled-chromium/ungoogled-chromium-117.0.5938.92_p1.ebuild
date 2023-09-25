@@ -5,7 +5,7 @@ EAPI=8
 
 PYTHON_COMPAT=( python3_{10..11} )
 PYTHON_REQ_USE="xml(+)"
-LLVM_MAX_SLOT=16
+LLVM_MAX_SLOT=17
 
 CHROMIUM_LANGS="af am ar bg bn ca cs da de el en-GB es es-419 et fa fi fil fr gu he
 	hi hr hu id it ja kn ko lt lv ml mr ms nb nl pl pt-BR pt-PT ro ru sk sl sr
@@ -24,8 +24,6 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET="2"
-PATCHSET_NAME="chromium-116-patchset-${PATCHSET}"
 PATCHSET_PPC64="117.0.5938.62-1raptor0~deb12u1"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://gitlab.com/Matt.Jolly/chromium-patches/-/archive/${C_PV}/chromium-patches-${C_PV}.tar.bz2
