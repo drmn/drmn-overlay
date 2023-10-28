@@ -8,6 +8,7 @@ PYTHON_COMPAT=( python3_{10..11} )
 PYTHON_REQ_USE="xml(+)"
 LLVM_MAX_SLOT=17
 VIRTUALX_REQUIRED="pgo"
+GN_MIN_VER="0.2114"
 
 CHROMIUM_LANGS="af am ar bg bn ca cs da de el en-GB es es-419 et fa fi fil fr gu he
 	hi hr hu id it ja kn ko lt lv ml mr ms nb nl pl pt-BR pt-PT ro ru sk sl sr
@@ -179,7 +180,7 @@ BDEPEND="
 		$(depend_clang_llvm_versions 17)
 	)
 	dev-lang/perl
-	>=dev-util/gn-0.2114
+	>=dev-util/gn-${GN_MIN_VER}
 	>=dev-util/gperf-3.0.3
 	>=dev-util/ninja-1.7.2
 	dev-vcs/git
@@ -309,6 +310,9 @@ pkg_setup() {
 			if ver_test "$(clang-major-version)" -lt 17; then
 				die "At least clang 17 is required"
 			fi
+		fi
+		if ver_test $(gn --version || die) -lt ${GN_MIN_VER}; then
+				die "dev-util/gn >= ${GN_MIN_VER} is required to build this Chromium"
 		fi
 	fi
 
