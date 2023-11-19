@@ -34,7 +34,7 @@ S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PATCHSET_PPC64="118.0.5993.70-1raptor0~deb11u1"
-PATCH_V="${C_PV%%\.*}-1"
+PATCH_V="${C_PV%%\.*}-3"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	https://gitlab.com/Matt.Jolly/chromium-patches/-/archive/${PATCH_V}/chromium-patches-${PATCH_V}.tar.bz2
 	ppc64? (
