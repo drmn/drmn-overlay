@@ -206,9 +206,9 @@ BDEPEND="
 		$(depend_clang_llvm_versions ${LLVM_MIN_SLOT} ${LLVM_MAX_SLOT})
 	)
 	dev-lang/perl
-	>=dev-util/gn-${GN_MIN_VER}
+	>=dev-build/gn-${GN_MIN_VER}
 	>=dev-util/gperf-3.0.3
-	>=dev-util/ninja-1.7.2
+	>=dev-build/ninja-1.7.2
 	dev-vcs/git
 	>=net-libs/nodejs-7.6.0[inspector]
 	>=sys-devel/bison-2.4.3
