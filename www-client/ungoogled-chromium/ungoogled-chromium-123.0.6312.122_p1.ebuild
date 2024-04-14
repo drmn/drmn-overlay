@@ -74,7 +74,7 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET_PPC64="123.0.6312.86-1raptor0~deb12u1"
+PATCHSET_PPC64="123.0.6312.105-1raptor0~deb12u1"
 PATCH_V="${C_PV%%\.*}"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	system-toolchain? (
@@ -95,7 +95,7 @@ SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_
 
 LICENSE="BSD"
 SLOT="0/stable"
-KEYWORDS="amd64 arm64"
+KEYWORDS="amd64 arm64 ~ppc64"
 IUSE_SYSTEM_LIBS="+system-harfbuzz +system-icu +system-png +system-zstd"
 IUSE="+X ${IUSE_SYSTEM_LIBS} bindist cups custom-cflags debug ffmpeg-chromium gtk4 +hangouts headless kerberos libcxx lto +official pax-kernel pgo +proprietary-codecs pulseaudio"
 IUSE+=" qt5 qt6 screencast selinux +system-toolchain vaapi wayland +widevine"
@@ -452,6 +452,7 @@ src_prepare() {
 		"${FILESDIR}/chromium-111-InkDropHost-crash.patch"
 		"${FILESDIR}/chromium-117-system-zstd.patch"
 		"${FILESDIR}/chromium-124-libwebp-shim-sharpyuv.patch"
+		"${FILESDIR}/chromium-123-qt-gui-check.patch"
 	)
 
 	if use system-toolchain; then
@@ -481,6 +482,7 @@ src_prepare() {
 		done
 		PATCHES+=( "${WORKDIR}/ppc64le" )
 		PATCHES+=( "${WORKDIR}/debian/patches/fixes/rust-clanglib.patch" )
+		PATCHES+=( "${WORKDIR}/debian/patches/fixes/blink-fonts-shape-result.patch" )
 	fi
 
 	default
