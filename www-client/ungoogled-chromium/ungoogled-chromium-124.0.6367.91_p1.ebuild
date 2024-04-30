@@ -74,7 +74,7 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET_PPC64="123.0.6312.105-1raptor0~deb12u1"
+PATCHSET_PPC64="124.0.6367.60-1raptor0~deb12u1"
 PATCH_V="${C_PV%%\.*}"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	system-toolchain? (
@@ -257,8 +257,8 @@ BDEPEND="
 		>=virtual/rust-${RUST_MIN_VER}[profiler(-)]
 	)
 	>=dev-build/gn-${GN_MIN_VER}
+	<dev-build/ninja-1.12
 	dev-lang/perl
-	<dev-build/ninja-1.12.0
 	>=dev-util/gperf-3.0.3
 	dev-vcs/git
 	>=net-libs/nodejs-7.6.0[inspector]
@@ -343,7 +343,7 @@ pre_build_checks() {
 	# Check build requirements: bugs #471810, #541816, #914220
 	# We're going to start doing maths here on the size of an unpacked source tarball,
 	# this should make updates easier as chromium continues to balloon in size.
-	local BASE_DISK=19
+	local BASE_DISK=22
 	local EXTRA_DISK=1
 	local CHECKREQS_MEMORY="4G"
 	tc-is-cross-compiler && EXTRA_DISK=2
