@@ -841,7 +841,7 @@ chromium_configure() {
 			# Workaround for build failure with clang-18 and -march=native without
 			# avx512. Does not affect e.g. -march=skylake, only native (bug #931623).
 			use amd64 && is-flagq -march=native &&
-				[[ $(clang-major-version) -ge 18 ]] &&
+				[[ $(clang-major-version) -eq 18 ]] && [[ $(clang-micro-version) -lt 6 ]] &&
 				tc-cpp-is-true "!defined(__AVX512F__)" ${CXXFLAGS} &&
 				append-flags -mevex512
 		else
