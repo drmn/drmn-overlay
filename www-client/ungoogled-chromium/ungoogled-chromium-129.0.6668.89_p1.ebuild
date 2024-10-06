@@ -27,8 +27,8 @@ EAPI=8
 GN_MIN_VER=0.2165
 RUST_MIN_VER=1.78.0
 # chromium-tools/get-chromium-toolchain-strings.sh
-GOOGLE_CLANG_VER=llvmorg-19-init-14561-gecea8371-3000
-GOOGLE_RUST_VER=3cf924b934322fd7b514600a7dc84fc517515346-3
+GOOGLE_CLANG_VER=llvmorg-20-init-1009-g7088a5ed-10
+GOOGLE_RUST_VER=595316b4006932405a63862d8fe65f71a6356293-5
 
 : ${CHROMIUM_FORCE_GOOGLE_TOOLCHAIN=no}
 
@@ -56,7 +56,7 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PATCHSET_PPC64="127.0.6533.88-1raptor0~deb12u2"
+PATCHSET_PPC64="128.0.6613.84-1raptor0~deb12u1"
 PATCH_V="${C_PV%%\.*}"
 SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_P}.tar.xz
 	system-toolchain? (
@@ -65,7 +65,7 @@ SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_
 	!system-toolchain? (
 		https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/clang-${GOOGLE_CLANG_VER}.tar.xz
 			-> chromium-${PV%%\.*}-clang.tar.xz
-		https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/rust-toolchain-${GOOGLE_RUST_VER}-${GOOGLE_CLANG_VER%?????}.tar.xz
+		https://commondatastorage.googleapis.com/chromium-browser-clang/Linux_x64/rust-toolchain-${GOOGLE_RUST_VER}-${GOOGLE_CLANG_VER%???}.tar.xz
 			-> chromium-${PV%%\.*}-rust.tar.xz
 	)
 	ppc64? (
@@ -77,7 +77,7 @@ SRC_URI="https://commondatastorage.googleapis.com/chromium-browser-official/${C_
 
 LICENSE="BSD"
 SLOT="0/stable"
-KEYWORDS="amd64 arm64 ~ppc64"
+KEYWORDS="amd64 arm64"
 IUSE_SYSTEM_LIBS="+system-harfbuzz +system-icu +system-png +system-zstd"
 IUSE="+X ${IUSE_SYSTEM_LIBS} bindist cups custom-cflags debug ffmpeg-chromium gtk4 +hangouts headless kerberos +official pax-kernel pgo +proprietary-codecs pulseaudio"
 IUSE+=" qt5 qt6 +screencast selinux +system-toolchain +vaapi +wayland +widevine"
@@ -423,7 +423,21 @@ pkg_setup() {
 					einfo "Using rust ${rustc_ver} to build"
 			fi
 
+			# Chromium requires the Rust profiler library while setting up its build environment.
+			# Since a standard Rust comes with the profiler, instead of patching it out (build/rust/std/BUILD.gn#L103)
+			# we'll just do a sanity check on the selected slot.
+			if [[ "$(eselect --brief rust show 2>/dev/null)" != *"bin"* ]]; then
+				local arch=$(uname -m)
+				local rust_lib_path="${EPREFIX}/usr/lib/rust/${rustc_ver}/lib/rustlib/${arch}-unknown-linux-gnu/lib"
+				local profiler_lib=$(find "${rust_lib_path}" -name "libprofiler_builtins-*.rlib" -print -quit)
+				if [[ -z "${profiler_lib}" ]]; then
+					eerror "Rust ${rustc_ver} is missing the profiler library."
+					eerror "ebuild dependency resolution should have ensured that a Rust with the profiler was installed."
+					die "Please \`eselect\` a Rust slot that has the profiler."
+				fi
+			fi
 		fi
+
 		# Users should never hit this, it's purely a development convenience
 		if ver_test $(gn --version || die) -lt ${GN_MIN_VER}; then
 			die "dev-build/gn >= ${GN_MIN_VER} is required to build this Chromium"
@@ -459,6 +473,7 @@ src_unpack() {
 	unpack ${UC_P}.tar.gz
 	mkdir ${UC_P}/build || die
 	ln -s ../../${C_P} ${UC_P}/build/src || die
+	sed -e '/third_party\/node\/linux\/node-linux-x64\/bin\/node/d' -i ${UC_P}/pruning.list || die
 }
 
 src_prepare() {
@@ -478,7 +493,7 @@ src_prepare() {
 	# disable global media controls, crashes with libstdc++
 	sed -i -e \
 		"/\"GlobalMediaControlsCastStartStop\"/,+4{s/ENABLED/DISABLED/;}" \
-		"chrome/browser/media/router/media_router_feature.cc" || die
+		"chrome/browser/media/router/media_router_feature.cc"
 
 	local PATCHES=(
 		"${FILESDIR}/chromium-cross-compile.patch"
@@ -486,22 +501,17 @@ src_prepare() {
 		"${FILESDIR}/chromium-111-InkDropHost-crash.patch"
 		"${FILESDIR}/chromium-126-oauth2-client-switches.patch"
 		"${FILESDIR}/chromium-127-bindgen-custom-toolchain.patch"
-		"${FILESDIR}/chromium-127-updater-systemd.patch"
 	)
-
-	# 127: test deps are broken for ui/lens with system ICU "//third_party/icu:icuuc_public"
-	sed -i '/source_set("unit_tests") {/,/}/d' \
-		chrome/browser/ui/lens/BUILD.gn || die "Failed to remove bad test target"
-	sed -i '/lens:unit_tests/d' chrome/test/BUILD.gn components/BUILD.gn \
-		|| die "Failed to remove dependencies on bad target"
 
 	if use system-toolchain; then
 		# The patchset is really only required if we're using the system-toolchain
 		PATCHES+=( "${WORKDIR}/chromium-patches-${PATCH_V}" )
-		# We can't use the bundled compiler builtins
-		sed -i -e \
-			"/if (is_clang && toolchain_has_rust) {/,+2d" \
-			build/config/compiler/BUILD.gn || die "Failed to disable bundled compiler builtins"
+		# We can't use the bundled compiler builtins with the system toolchain
+		# `grep` is a development convenience to ensure we fail early when google changes something.
+		local builtins_match="if (is_clang && !is_nacl && !is_cronet_build) {"
+		grep -q "${builtins_match}" build/config/compiler/BUILD.gn || die "Failed to disable bundled compiler builtins"
+		sed -i -e "/${builtins_match}/,+2d" build/config/compiler/BUILD.gn
+
 	else
 		mkdir -p third_party/llvm-build/Release+Asserts || die "Failed to bundle llvm"
 		ln -s "${WORKDIR}"/bin third_party/llvm-build/Release+Asserts/bin || die "Failed to symlink llvm bin"
@@ -664,7 +674,6 @@ src_prepare() {
 		third_party/libsecret
 		third_party/libsrtp
 		third_party/libsync
-		third_party/libudev
 		third_party/liburlpattern
 		third_party/libva_protected_content
 		third_party/libvpx
@@ -718,6 +727,7 @@ src_prepare() {
 		third_party/pyjson5
 		third_party/pyyaml
 		third_party/qcms
+		third_party/rapidhash
 		third_party/re2
 		third_party/rnnoise
 		third_party/rust
@@ -1164,6 +1174,8 @@ chromium_configure() {
 		sed -i 's/OFFICIAL_BUILD/GOOGLE_CHROME_BUILD/' \
 			tools/generate_shim_headers/generate_shim_headers.py || die
 		# Req's LTO; TODO: not compatible with -fno-split-lto-unit
+		# split-lto-unit can be enabled with RUSTC_BOOTSTRAP=1 (and an updated compiler patch),
+		# however I still got weird linking errors with CFI _and_ the split unit LTO OOMed after using 100G.
 		myconf_gn+=" is_cfi=false"
 		# Don't add symbols to build
 		myconf_gn+=" symbol_level=0"
