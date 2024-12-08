@@ -37,10 +37,10 @@ DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PPC64_HASH="a85b64f07b489b8c6fdb13ecf79c16c56c560fc6"
 PATCH_V="${C_PV%%\.*}-1"
-SRC_URI="https://chromium-tarballs.distfiles.gentoo.org/${C_P}.tar.xz -> ${C_P}-gentoo.tar.xz
+SRC_URI="https://chromium-tarballs.distfiles.gentoo.org/${C_P}-linux.tar.xz
 		https://gitlab.com/Matt.Jolly/chromium-patches/-/archive/${PATCH_V}/chromium-patches-${PATCH_V}.tar.bz2
 	test? (
-		https://chromium-tarballs.distfiles.gentoo.org/${C_P}-testdata.tar.xz -> ${C_P}-testdata-gentoo.tar.xz
+		https://chromium-tarballs.distfiles.gentoo.org/${C_P}-linux-testdata.tar.xz
 		https://chromium-fonts.storage.googleapis.com/${TEST_FONT} -> chromium-testfonts-${TEST_FONT:0:10}.tar.gz
 	)
 	ppc64? (
@@ -318,20 +318,20 @@ pkg_setup() {
 			die "Please switch to a different linker."
 		fi
 
-		# Forcing clang; user choice respected by llvm_slot_x USE
+		llvm-r1_pkg_setup
+		rust_pkg_setup
+		
+		# Forcing clang; respect llvm_slot_x to enable selection of impl from LLVM_COMPAT
 		AR=llvm-ar
-		CPP="${CHOST}-clang++ -E"
+		CPP="${CHOST}-clang++-${LLVM_SLOT} -E"
 		NM=llvm-nm
-		CC=${CHOST}-clang
-		CXX=${CHOST}-clang++
+		CC="${CHOST}-clang-${LLVM_SLOT}"
+		CXX="${CHOST}-clang++-${LLVM_SLOT}"
 
 		if tc-is-cross-compiler; then
 			use pgo && die "The pgo USE flag cannot be used when cross-compiling"
-			CPP="${CBUILD}-clang++ -E"
+			CPP="${CBUILD}-clang++-${LLVM_SLOT} -E"
 		fi
-
-		llvm-r1_pkg_setup
-		rust_pkg_setup
 
 		# I hate doing this but upstream Rust have yet to come up with a better solution for
 		# us poor packagers. Required for Split LTO units, which are required for CFI.
@@ -347,7 +347,7 @@ pkg_setup() {
 }
 
 src_unpack() {
-	unpack ${C_P}-gentoo.tar.xz
+	unpack ${C_P}-linux.tar.xz
 	unpack chromium-patches-${PATCH_V}.tar.bz2
 
 	use pgo && unpack chromium-profiler-0.2.tar
@@ -364,8 +364,7 @@ src_unpack() {
 	fi
 
 	if use ppc64; then
-		unpack chromium_${PATCHSET_PPC64}.debian.tar.xz
-		unpack chromium-ppc64le-gentoo-patches-1.tar.xz
+		unpack chromium-openpower-${PPC64_HASH:0:10}.tar.bz2
 	fi
 
 	unpack ${UC_P}.tar.gz
