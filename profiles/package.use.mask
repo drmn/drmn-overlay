@@ -1,15 +1,8 @@
 # From gentoo repository's chromium package
->=www-client/ungoogled-chromium-113 system-av1
+www-client/ungoogled-chromium llvm_slot_20
+www-client/ungoogled-chromium system-icu
 >=www-client/ungoogled-chromium-104 pgo
->=www-client/ungoogled-chromium-94 system-ffmpeg
 >=www-client/ungoogled-chromium-84 headless
-www-client/ungoogled-chromium component-build
 
 # Adjustment for ungoogled-chromium build flags
 www-client/ungoogled-chromium hangouts js-type-check
-
-# Matt Jolly <kangie@gentoo.org> (2024-11-11)
-# ICU 76.1 is not compatible with Chromium. Bug #943216.
-# We'll mask it for a few weeks to use the bundled ICU
-# while Google fixes the issue.
-www-client/ungoogled-chromium system-icu
