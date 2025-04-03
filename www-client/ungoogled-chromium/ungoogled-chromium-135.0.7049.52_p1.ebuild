@@ -22,7 +22,7 @@ EAPI=8
 # new "Distro tarballs" and include binaries (etc) that are not useful for
 # downstream consumers (like distributions).
 
-GN_MIN_VER=0.2207
+GN_MIN_VER=0.2217
 # chromium-tools/get-chromium-toolchain-strings.py
 TEST_FONT=f26f29c9d3bfae588207bbc9762de8d142e58935c62a86f67332819b15203b35
 BUNDLED_CLANG_VER=llvmorg-20-init-17108-g29ed6000-3
@@ -54,7 +54,7 @@ S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
 PPC64_HASH="a85b64f07b489b8c6fdb13ecf79c16c56c560fc6"
-PATCH_V="${C_PV%%\.*}-1"
+PATCH_V="${C_PV%%\.*}"
 SRC_URI="https://chromium-tarballs.distfiles.gentoo.org/${C_P}-linux.tar.xz
 	!bundled-toolchain? (
 		https://gitlab.com/Matt.Jolly/chromium-patches/-/archive/${PATCH_V}/chromium-patches-${PATCH_V}.tar.bz2
@@ -76,11 +76,11 @@ SRC_URI="https://chromium-tarballs.distfiles.gentoo.org/${C_P}-linux.tar.xz
 	https://github.com/Eloston/ungoogled-chromium/archive/${UC_PV}.tar.gz -> ${UC_P}.tar.gz"
 
 LICENSE="BSD"
-SLOT="0/stable"
+SLOT="0/beta"
 # Dev exists mostly to give devs some breathing room for beta/stable releases;
 # it shouldn't be keyworded but adventurous users can select it.
 if [[ ${SLOT} != "0/dev" ]]; then
-	KEYWORDS="amd64 arm64 ~ppc64"
+	KEYWORDS="amd64 arm64"
 fi
 
 IUSE_SYSTEM_LIBS="+system-harfbuzz +system-icu +system-png +system-zstd"
@@ -433,10 +433,9 @@ src_prepare() {
 		"${FILESDIR}/chromium-109-system-zlib.patch"
 		"${FILESDIR}/chromium-111-InkDropHost-crash.patch"
 		"${FILESDIR}/chromium-131-unbundle-icu-target.patch"
-		"${FILESDIR}/chromium-134-map_droppable-glibc.patch"
-		"${FILESDIR}/chromium-134-oauth2-client-switches.patch"
 		"${FILESDIR}/chromium-134-bindgen-custom-toolchain.patch"
-		"${FILESDIR}/chromium-135-fix-non-wayland-build.patch"
+		"${FILESDIR}/chromium-135-oauth2-client-switches.patch"
+		"${FILESDIR}/chromium-135-map_droppable-glibc.patch"
 	)
 
 	if use bundled-toolchain; then
@@ -639,7 +638,6 @@ src_prepare() {
 		third_party/googletest
 		third_party/highway
 		third_party/hunspell
-		third_party/iccjpeg
 		third_party/ink_stroke_modeler/src/ink_stroke_modeler
 		third_party/ink_stroke_modeler/src/ink_stroke_modeler/internal
 		third_party/ink/src/ink/brush
@@ -725,6 +723,7 @@ src_prepare() {
 		third_party/private_membership
 		third_party/private-join-and-compute
 		third_party/protobuf
+		third_party/protobuf/third_party/utf8_range
 		third_party/pthreadpool
 		third_party/puffin
 		third_party/pyjson5
