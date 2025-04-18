@@ -15,12 +15,8 @@ EAPI=8
 # and need to get a release out quickly (less likely with `dev` in-tree).
 
 # Since m133 we are using CI-generated tarballs from
-# https://github.com/chromium-linux-tarballs/chromium-tarballs/ (uploaded to S3
-# and made available via https://chromium-tarballs.distfiles.gentoo.org/).
-
-# We do this because upstream tarballs weigh in at about 3.5x the size of our
-# new "Distro tarballs" and include binaries (etc) that are not useful for
-# downstream consumers (like distributions).
+# https://github.com/chromium-linux-tarballs/chromium-tarballs/ as we have
+# control over the generation and are able to avoid issues with upstream CI.
 
 GN_MIN_VER=0.2217
 # chromium-tools/get-chromium-toolchain-strings.py
@@ -53,7 +49,7 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PPC64_HASH="a85b64f07b489b8c6fdb13ecf79c16c56c560fc6"
+PPC64_HASH="2c25ddd2bbabaef094918fe15eb5de524d16949c"
 PATCH_V="${C_PV%%\.*}"
 SRC_URI="https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/${C_PV}/chromium-${C_PV}-linux.tar.xz
 	!bundled-toolchain? (
@@ -81,7 +77,7 @@ SLOT="0/stable"
 # it shouldn't be keyworded but adventurous users can select it.
 # Do _not_ drop stable keywords for amd64 on patch releases. aarch64 still needs to go through the stablereq process.
 if [[ ${SLOT} != "0/dev" ]]; then
-	KEYWORDS="amd64 arm64"
+	KEYWORDS="amd64 arm64 ~ppc64"
 fi
 
 IUSE_SYSTEM_LIBS="+system-harfbuzz +system-icu +system-png +system-zstd"
@@ -282,7 +278,7 @@ pre_build_checks() {
 		if use custom-cflags; then
 			extra_disk=$((extra_disk + 5))
 		fi
-		CHECKREQS_MEMORY="16G"
+		memory=$((memory * 2))
 	fi
 	local CHECKREQS_MEMORY="${memory}G"
 	local CHECKREQS_DISK_BUILD="$((base_disk + extra_disk))G"
@@ -441,6 +437,7 @@ src_prepare() {
 		"${FILESDIR}/chromium-135-oauth2-client-switches.patch"
 		"${FILESDIR}/chromium-135-map_droppable-glibc.patch"
 		"${FILESDIR}/chromium-135-webrtc-pipewire.patch"
+		"${FILESDIR}/chromium-135-gperf.patch"
 	)
 
 	if use bundled-toolchain; then
