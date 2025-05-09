@@ -54,7 +54,7 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PPC64_HASH="a85b64f07b489b8c6fdb13ecf79c16c56c560fc6"
+PPC64_HASH="01dda910156deccddab855e2b6adaea2c751ae45"
 PATCH_V="${C_PV%%\.*}-2"
 SRC_URI="https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/${C_PV}/chromium-${C_PV}-linux.tar.xz
 	!bundled-toolchain? (
@@ -81,7 +81,7 @@ SLOT="0/stable"
 # Dev exists mostly to give devs some breathing room for beta/stable releases;
 # it shouldn't be keyworded but adventurous users can select it.
 if [[ ${SLOT} != "0/dev" ]]; then
-	KEYWORDS="amd64 arm64"
+	KEYWORDS="amd64 arm64 ~ppc64"
 fi
 
 IUSE_SYSTEM_LIBS="+system-harfbuzz +system-icu +system-png +system-zstd"
