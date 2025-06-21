@@ -1,5 +1,4 @@
 # From gentoo repository's chromium package
-www-client/ungoogled-chromium llvm_slot_20
 www-client/ungoogled-chromium system-icu
 >=www-client/ungoogled-chromium-104 pgo
 >=www-client/ungoogled-chromium-84 headless
