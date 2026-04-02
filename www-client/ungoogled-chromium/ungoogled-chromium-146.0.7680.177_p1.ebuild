@@ -971,6 +971,7 @@ src_prepare() {
 		third_party/xdg-utils
 
 		# ungoogled-chromium
+		third_party/hyphenation-patterns
 		third_party/ungoogled-chromium
 	)
 
