@@ -1002,7 +1002,7 @@ src_prepare() {
 
 	# USE=system-*
 	if ! use system-harfbuzz; then
-		keeplibs+=( third_party/harfbuzz-ng )
+		keeplibs+=( third_party/harfbuzz )
 	fi
 
 	if ! use system-icu; then
@@ -1076,6 +1076,9 @@ src_prepare() {
 chromium_configure() {
 	# Calling this here supports resumption via FEATURES=keepwork
 	python_setup
+
+	# 974899: sometimes people try to build with a non-Unicode locale and python gets very upset
+	python_export_utf8_locale || die "Chromium builds require a UTF-8 locale."
 
 	# Bug 491582.
 	export TMPDIR="${WORKDIR}/temp"
@@ -1404,14 +1407,11 @@ chromium_configure() {
 
 	einfo "Configuring Chromium ..."
 	# ungoogled-chromium flags
-	myconf_gn+=" build_with_tflite_lib=false"
 	myconf_gn+=" chrome_pgo_phase=0"
 	#myconf_gn+=" clang_use_chrome_plugins=false"
 	#myconf_gn+=" disable_fieldtrial_testing_config=true"
 	#myconf_gn+=" enable_hangout_services_extension=false"
 	myconf_gn+=" enable_mdns=false"
-	#myconf_gn+=" enable_nacl=false"
-	myconf_gn+=" enable_reading_list=false"
 	myconf_gn+=" enable_remoting=false"
 	myconf_gn+=" enable_reporting=false"
 	myconf_gn+=" enable_service_discovery=false"
@@ -1424,6 +1424,9 @@ chromium_configure() {
 	# myconf_gn+=" treat_warnings_as_errors=false"
 	myconf_gn+=" use_official_google_api_keys=false"
 	myconf_gn+=" use_unofficial_version_number=false"
+	myconf_gn+=" v8_drumbrake_bounds_checks=true"
+	myconf_gn+=" v8_enable_drumbrake=true"
+
 
 	set -- gn gen --args="${myconf_gn[*]}${EXTRA_GN:+ ${EXTRA_GN}}" out/Release
 	echo "$@"
