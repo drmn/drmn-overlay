@@ -179,6 +179,7 @@ COMMON_DEPEND="
 		cups? ( >=net-print/cups-1.3.11:= )
 		qt6? ( dev-qt/qtbase:6[gui,widgets] )
 		X? ( ${COMMON_X_DEPEND} )
+		wayland? ( screencast? ( media-video/pipewire:= ) )
 	)
 "
 RDEPEND="${COMMON_DEPEND}
@@ -198,8 +199,10 @@ RDEPEND="${COMMON_DEPEND}
 		ffmpeg-chromium? ( media-video/ffmpeg-chromium:${PV%%\.*} )
 	)
 "
+# For M149+ pipewire is a mandatory build-time dependency, but it's optional at runtime for most configurations.
 DEPEND="${COMMON_DEPEND}
 	!headless? (
+		media-video/pipewire
 		gtk4? ( gui-libs/gtk:4[X?,wayland?] )
 		!gtk4? ( x11-libs/gtk+:3[X?,wayland?] )
 	)
@@ -1338,6 +1341,8 @@ chromium_configure() {
 			"ozone_platform_x11=$(usex X true false)"
 			"ozone_platform=\"$(usex wayland wayland x11)\""
 			"rtc_use_pipewire=$(usex screencast true false)"
+			# As above - link directly instead of dlopening
+			"rtc_link_pipewire=$(usex screencast true false)"
 			"use_cups=$(usex cups true false)"
 			"use_kerberos=$(usex kerberos true false)"
 			"use_pulseaudio=$(usex pulseaudio true false)"
