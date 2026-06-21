@@ -156,7 +156,6 @@ COMMON_SNAPSHOT_DEPEND="
 		wayland? (
 			dev-libs/libffi:=
 			dev-libs/wayland:=
-			screencast? ( media-video/pipewire:= )
 		)
 	)
 "
