@@ -196,7 +196,7 @@ RDEPEND="${COMMON_DEPEND}
 	selinux? ( sec-policy/selinux-chromium )
 	bindist? (
 		!ffmpeg-chromium? ( >=media-video/ffmpeg-6.1-r1:0/58.60.60[chromium] )
-		ffmpeg-chromium? ( media-video/ffmpeg-chromium:${PV%%\.*} )
+		ffmpeg-chromium? ( >=media-video/ffmpeg-chromium-150.0.7871.124:${C_PV%%\.*} )
 	)
 "
 # For M149+ pipewire is a mandatory build-time dependency, but it's optional at runtime for most configurations.
