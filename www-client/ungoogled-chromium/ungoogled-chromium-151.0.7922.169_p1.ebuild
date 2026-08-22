@@ -27,10 +27,11 @@ GN_MIN_VER=0.2374
 # chromium-tools/get-chromium-toolchain-strings.py (or just use Chromicler)
 # Node for M145+ should be 24.12.0 but that's not packaged in Gentoo yet. See #969145
 TEST_FONT="9c07d19d9c5ee1ff94f717e6fb17e0c8c354e6f9"
-BUNDLED_CLANG_VER="llvmorg-23-init-10931-g20b6ec66-11"
-BUNDLED_RUST_VER="4c4205163abcbd08948b3efab796c543ba1ea687-5"
+BUNDLED_CLANG_VER="llvmorg-23-init-19482-g53d18800-1"
+BUNDLED_RUST_VER="b998449636a48e2c4a362809085b600a0174e1f2-2"
 RUST_SHORT_HASH=${BUNDLED_RUST_VER:0:10}-${BUNDLED_RUST_VER##*-}
 NODE_VER="24.16.0-r1"
+GO_MIN_VER="1.25.0"
 ESBUILD_VER="0.25.1"
 ROLLUP_VER="4.57.1" # currently manual.
 VIRTUALX_REQUIRED="pgo"
@@ -58,9 +59,9 @@ UC_P=ungoogled-chromium-${UC_PV}
 S="${WORKDIR}/${C_P}"
 DESCRIPTION="Google Chromium, sans integration with Google"
 HOMEPAGE="https://github.com/Eloston/ungoogled-chromium"
-PPC64_HASH="a85b64f07b489b8c6fdb13ecf79c16c56c560fc6"
-PATCH_V="${C_PV%%\.*}-1"
-COPIUM_COMMIT="b00f26bb5e0781020da5f830981472a142c6baf1"
+PPC64_HASH="7aae8a84e327fc2078ce1625c9c70bfda77d626f"
+PATCH_V="151-3"
+COPIUM_COMMIT="3c7e56fb4523b43b47595bb3a22f77178fc76293"
 SRC_URI="https://github.com/chromium-linux-tarballs/chromium-tarballs/releases/download/${C_PV}/chromium-${C_PV}-linux.tar.xz
 	https://deps.gentoo.zip/www-client/chromium/rollup-wasm-node-${ROLLUP_VER}.tgz
 	https://gitlab.com/Matt.Jolly/chromium-patches/-/archive/${PATCH_V}/chromium-patches-${PATCH_V}.tar.bz2
@@ -90,10 +91,7 @@ LICENSE+=" Unicode-DFS-2015 Unlicense UoI-NCSA ZLIB libtiff openssl"
 LICENSE+=" rar? ( unRAR )"
 
 SLOT="stable"
-# Unstable in gentoo exists mostly to give devs some breathing room for beta/stable releases.
-# It shouldn't be keyworded but adventurous users are encouraged to select it;
-# there's official dev channel Google Chrome after all.
-KEYWORDS="amd64 arm64"
+KEYWORDS="amd64 arm64 ~ppc64"
 
 IUSE_SYSTEM_LIBS="+system-harfbuzz +system-icu +system-zstd"
 IUSE="+X ${IUSE_SYSTEM_LIBS} bindist bundled-toolchain cups custom-cflags debug ffmpeg-chromium gtk4 +hangouts headless kerberos +official pax-kernel pgo"
@@ -196,7 +194,7 @@ RDEPEND="${COMMON_DEPEND}
 	selinux? ( sec-policy/selinux-chromium )
 	bindist? (
 		!ffmpeg-chromium? ( >=media-video/ffmpeg-6.1-r1:0/58.60.60[chromium] )
-		ffmpeg-chromium? ( >=media-video/ffmpeg-chromium-150.0.7871.124:${C_PV%%\.*} )
+		ffmpeg-chromium? ( media-video/ffmpeg-chromium:${PV%%\.*} )
 	)
 "
 # For M149+ pipewire is a mandatory build-time dependency, but it's optional at runtime for most configurations.
@@ -221,13 +219,10 @@ BDEPEND="
 	!bundled-toolchain? ( $(llvm_gen_dep '
 		llvm-core/clang:${LLVM_SLOT}
 		llvm-core/llvm:${LLVM_SLOT}
+		llvm-core/lld:${LLVM_SLOT}
 		official? (
 			!ppc64? ( llvm-runtimes/compiler-rt-sanitizers:${LLVM_SLOT}[cfi] )
 		) ')
-		|| (
-			$(llvm_gen_dep 'llvm-core/lld:${LLVM_SLOT}')
-			>=sys-devel/mold-2.41.0
-		)
 		${RUST_DEPEND}
 	)
 	pgo? (
@@ -236,6 +231,7 @@ BDEPEND="
 	)
 	>=dev-util/bindgen-0.72.1
 	>=dev-build/gn-${GN_MIN_VER}
+	>=dev-lang/go-${GO_MIN_VER}
 	app-alternatives/ninja
 	dev-lang/perl
 	>=dev-util/gperf-3.2
@@ -346,6 +342,10 @@ pkg_setup() {
 		if use !bundled-toolchain; then
 			llvm-r1_pkg_setup
 			rust_pkg_setup
+
+			if tc-ld-is-mold; then
+				ewarn "Mold is currently not supported, it will not be used"
+			fi
 
 			# Forcing clang; respect llvm_slot_x to enable selection of impl via LLVM_COMPAT
 			AR=llvm-ar
@@ -529,11 +529,27 @@ src_prepare() {
 		"${WORKDIR}/chromium-patches-${PATCH_V}/common/"
 	)
 
-	# https://issues.chromium.org/issues/442698344
-	# Unreleased fontconfig changed magic numbers and google have rolled to this version
-	if has_version "<=media-libs/fontconfig-2.17.1"; then
-		PATCHES+=( "${FILESDIR}/chromium-142-work-with-old-fontconfig.patch" )
+	# So many fontconfig magic numbers to cover
+	# TODO: once upstream roll to 2.18.2+ set that as our minimum and remove this logic.
+	# <=2.17.1 -> 9
+	# >2.17.1 && <2.18.2 -> 11
+	# >=2.18.2 -> 12
+	local fontconfig_cache_magic=9
+	if has_version ">=media-libs/fontconfig-2.18.2"; then
+		fontconfig_cache_magic=12
+	elif has_version ">media-libs/fontconfig-2.17.1"; then
+		fontconfig_cache_magic=11
 	fi
+
+	sed -E -i \
+		-e "s#(fb5c91b2895aa445d23aebf7f9e2189c-le64\.cache-)(9|10|11|12)#\1${fontconfig_cache_magic}#g" \
+		third_party/test_fonts/fontconfig/BUILD.gn || die "Failed to set fontconfig cache magic in BUILD.gn"
+
+	sed -E -i \
+		-e "s#(kCacheKey \+ \"/-le64\.cache-)(9|10|11|12)(\")#\1${fontconfig_cache_magic}\3#g" \
+		-e "s#(kCacheKey \+ \"-le64\.cache-)(9|10|11|12)(\")#\1${fontconfig_cache_magic}\3#g" \
+		third_party/test_fonts/fontconfig/generate_fontconfig_caches.cc || \
+			die "Failed to set fontconfig cache magic in generate_fontconfig_caches.cc"
 
 	if use bundled-toolchain; then
 		# We need to symlink the toolchain into the expected location
@@ -695,8 +711,8 @@ src_prepare() {
 	# adjust python interpreter version
 	sed -i -e "s|\(^script_executable = \).*|\1\"${EPYTHON}\"|g" .gn || die
 
-	# Use the system copy of hwdata's usb.ids; upstream is woefully out of date (2015!)
-	sed 's|//third_party/usb_ids/usb.ids|/usr/share/hwdata/usb.ids|g' \
+	# Use the system copy of hwdata's usb.ids
+	sed 's|//third_party/usb_ids/src/usb.ids|/usr/share/hwdata/usb.ids|g' \
 		-i services/device/public/cpp/usb/BUILD.gn || die "Failed to set system usb.ids path"
 
 	# remove_bundled_libraries.py walks the source tree and looks for paths containing the substring 'third_party'
@@ -800,10 +816,17 @@ src_prepare() {
 		third_party/fast_float
 		third_party/fdlibm
 		third_party/federated_compute/chromium/fcp/confidentialcompute
+		third_party/federated_compute/chromium/fcp/protos
+		third_party/federated_compute/chromium/fcp/secagg
+		third_party/federated_compute/chromium/fcp/client
 		third_party/federated_compute/src/fcp/base
 		third_party/federated_compute/src/fcp/confidentialcompute
-		third_party/federated_compute/src/fcp/protos/confidentialcompute
-		third_party/federated_compute/src/fcp/protos/federatedcompute
+		third_party/federated_compute/src/fcp/protos
+		third_party/federated_compute/src/fcp/client
+		third_party/federated_compute/src/fcp/secagg
+		third_party/federated_compute/third_party/googleapis/src/google
+		third_party/federated_compute/third_party/tensorflow-federated
+		third_party/federated_compute/third_party/protodatastore-cpp
 		third_party/ffmpeg
 		third_party/fft2d
 		third_party/flatbuffers
@@ -1192,15 +1215,16 @@ chromium_configure() {
 			"rustc_version=\"${RUST_SLOT}\""
 		)
 
-		if tc-ld-is-mold; then
-			myconf_gn+=(
-				"use_mold=true"
-				"use_lld=false"
-				"linker_path=\"${EPREFIX}/usr/bin/mold\""
-			)
-		else
-			myconf_gn+=( "use_lld=true" )
-		fi
+		# Currently disabled, runtime issues with mold
+		#if tc-ld-is-mold; then
+		#	myconf_gn+=(
+		#		"use_mold=true"
+		#		"use_lld=false"
+		#		"linker_path=\"${EPREFIX}/usr/bin/mold\""
+		#	)
+		#else
+		myconf_gn+=( "use_lld=true" )
+		#fi
 
 		if [[ ${LLVM_SLOT} -lt 23 ]]; then
 			# Workaround for -fsanitize-ignore-for-ubsan-feature (added in LLVM 23)
@@ -1308,6 +1332,8 @@ chromium_configure() {
 		"use_thin_lto=${use_lto}"
 		# Only enabled for clang, but gcc has endian macros too
 		"v8_use_libm_trig_functions=true"
+		# use system go
+		"tint_use_system_go=true"
 	)
 
 	if use bindist ; then
@@ -1426,32 +1452,32 @@ chromium_configure() {
 		myconf_gn+=( "v8_enable_external_code_space=false" )
 	fi
 
+	myconf_gn+=(
+		"chrome_pgo_phase=0"
+		# "clang_use_chrome_plugins=false"
+		# "disable_fieldtrial_testing_config=true"
+		# "enable_hangout_services_extension=false"
+		"enable_mdns=false"
+		"enable_remoting=false"
+		"enable_reporting=false"
+		"enable_service_discovery=false"
+		# "enable_widevine=true"
+		"exclude_unwind_tables=true"
+		"google_api_key=\"\""
+		"google_default_client_id=\"\""
+		"google_default_client_secret=\"\""
+		"safe_browsing_mode=0"
+		# "treat_warnings_as_errors=false"
+		"use_official_google_api_keys=false"
+		"use_unofficial_version_number=false"
+		"v8_drumbrake_bounds_checks=true"
+	)
+
 	# Since we build from tarballs, we need to set the channel here so that it can be used in the build.
 	export CHROME_VERSION_EXTRA="${SLOT}"
 
 	einfo "Configuring Chromium ..."
-	# ungoogled-chromium flags
-	myconf_gn+=" build_with_tflite_lib=false"
-	myconf_gn+=" chrome_pgo_phase=0"
-	#myconf_gn+=" clang_use_chrome_plugins=false"
-	#myconf_gn+=" disable_fieldtrial_testing_config=true"
-	#myconf_gn+=" enable_hangout_services_extension=false"
-	myconf_gn+=" enable_mdns=false"
-	#myconf_gn+=" enable_nacl=false"
-	myconf_gn+=" enable_reading_list=false"
-	myconf_gn+=" enable_remoting=false"
-	myconf_gn+=" enable_reporting=false"
-	myconf_gn+=" enable_service_discovery=false"
-	#myconf_gn+=" enable_widevine=true"
-	myconf_gn+=" exclude_unwind_tables=true"
-	myconf_gn+=" google_api_key=\"\""
-	myconf_gn+=" google_default_client_id=\"\""
-	myconf_gn+=" google_default_client_secret=\"\""
-	myconf_gn+=" safe_browsing_mode=0"
-	# myconf_gn+=" treat_warnings_as_errors=false"
-	myconf_gn+=" use_official_google_api_keys=false"
-	myconf_gn+=" use_unofficial_version_number=false"
-
+	# add a `-v` here if gn `hangs` to see which file it's getting stuck on.
 	set -- gn gen --args="${myconf_gn[*]}${EXTRA_GN:+ ${EXTRA_GN}}" out/Release
 	echo "$@"
 	"$@" || die "Failed to configure Chromium"
@@ -1587,6 +1613,57 @@ src_test() {
 		'CriticalProcessAndThreadSpotChecks/HangWatcherAnyCriticalThreadTests.*'
 		'LazyThreadPoolTaskRunnerEnvironmentTest.*' # M142
 		'ToolsSanityTest.BadVirtualCall*'
+		# Since 151.0.7922.137
+		'CheckDeathTest.*'
+		'EnumSetDeathTest.*'
+		'OptionalRefDeathTest.*'
+		'RawRefDeathTest.*'
+		'AlternateTestParams/PartitionAllocDeathTest.CheckTriggered*'
+		'CallbackHelpersTest.*'
+		'SafeRefTest.*'
+		'SpanTest.*'
+		'WeakValueTableTest.*'
+		'PlatformSharedMemoryRegionTest.*'
+		'RefCountedOverflowTest.*'
+		'SingleThreadTaskRunnerCurrentDefaultHandleTest.*'
+		'TestFutureDeathTest.*'
+		'WeakPtrDeathTest.*'
+		'SafeRefDeathTest.*'
+		'LinkedListDeathTest.*'
+		'BindDeathTest.*'
+		'ReallocProtectedIteratorDeathTest.*'
+		'PASpanTest.*'
+		'BackupRefPtrTest.*'
+		'All/Base64Test.Overflow*'
+		'ValuesTest.*'
+		'TaskEnvironmentTest.*'
+		'CheckedObserverListTest.*'
+		'MemoryConsumerRegistryTest.*'
+		ProtectedMemoryDeathTest.FailsIfDefinedOutsideOfProtectMemoryRegion
+		StructuredSharedMemoryDeathTest.DuplicateRegion
+		CheckedContiguousIteratorDeathTest.OutOfBounds
+		HeapArrayDeathTest.TakeFirstWithOverSize
+		CallbackDeathTest.RunNullCallbackChecks
+		ObserverListThreadSafeDeathTest.CrossThreadRemovalRestricted
+		SequencedTaskRunnerCurrentDefaultHandleDeathTest.OverrideWithNull
+		TestFutureWithoutTaskEnvironmentDeathTest.WaitShouldDcheckWithoutTaskEnvironment
+		ScopedThreadPriorityDeathTest.NoRealTime
+		ReallocProtectedIteratorDeathTest.StringReallocCrashes
+		BarrierCallbackTest.ErrorToCallCallbackWithZeroCallbacks
+		BarrierClosureTest.ChecksIfCalledForZeroClosures
+		SupportsUserDataTest.ReentrantSetUserDataDuringRemoval
+		TimeBase.AddSubInfinities
+		LibcppHardeningTest.Assertions
+		IDMapTest.RemovedValueHandling
+		MultiMemoryConsumerTest.DuplicateInterventionsCheck
+		PersistentMemoryAllocatorTest.DelayedAllocationTest
+		SequenceCheckerTest.MoveOffSequenceBanned
+		ThreadCheckerTest.MoveOffThreadBanned
+		TokenType.TokenFromNullUnguessableToken
+		ZipTest.CheckForIterationPastTheEnd
+		MemoryConsumerTraitsTest.ActiveConsumerWithPassiveTraitsFails
+		SingleThreadTaskRunnerMainThreadDefaultHandleTest.Basic
+
 		# requires en-us locale
 		SysStrings.SysNativeMBAndWide
 		SysStrings.SysNativeMBToWide
@@ -1604,6 +1681,8 @@ src_test() {
 		StackTraceDeathTest.StackDumpSignalHandlerIsMallocFree
 		TestLauncherTools.TruncateSnippetFocusedMatchesFatalMessagesTest
 		ThreadPoolEnvironmentConfig.CanUseBackgroundPriorityForWorker
+		DriveInfoTest.GetFileDriveInfo
+
 	)
 	local test_filter="-$(IFS=:; printf '%s' "${skip_tests[*]}")"
 	# test-launcher-bot-mode enables parallelism and plain output
@@ -1674,6 +1753,19 @@ src_install() {
 		einfo "Creating symlink to libffmpeg.so from $(usex ffmpeg-chromium ffmpeg-chromium ffmpeg[chromium])..."
 		dosym ../chromium/libffmpeg.so$(usex ffmpeg-chromium .${C_PV%%\.*} "") \
 			/usr/$(get_libdir)/chromium-browser/libffmpeg.so
+	fi
+
+	local test_libs=(
+		"libimmediate_crash_test_helper.so"
+		"libmalloc_wrapper.so"
+		"libtest_shared_library.so"
+		"libtest_trace_processor.so"
+	)
+	if use test; then
+		local test_lib
+		for test_lib in "${test_libs[@]}"; do
+			rm -f "out/Release/${test_lib}" || die "Failed to remove ${test_lib}"
+		done
 	fi
 
 	(
