@@ -1,0 +1,4 @@
+# www-client/ungoogled-chromium is now masked due to the upstream
+# www-client/chromium::gentoo masked. It is suggested to switch to
+# the pf4public overlay.
+www-client/ungoogled-chromium
